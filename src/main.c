@@ -767,7 +767,11 @@ int main(int argc, char **argv)
  f = find_format(archive, args[ARG_ADD] != NULL, &exists);
  if(f == NULL)
  {
+  struct plat_info pi;
+  char why[512];
+  plat_fault(archive, why, sizeof(why));   /* before other calls change the error code */
   if(exists) error("%s is not an archive type arcedit knows", archive);
+  else if(plat_info(archive, &pi) == 0) error("%s", why);   /* there, but can't be read (in use) */
   else error("%s doesn't exist", archive);
   goto done;
  }
