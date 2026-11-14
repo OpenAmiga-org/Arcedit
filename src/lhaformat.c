@@ -71,15 +71,34 @@ static void lhaf_set_comment(ENTRY *e, const char *comment)
  lha_member_set_comment(e, comment);
 }
 
+/*
+** The attribute byte holds Amiga protection bits only for entries made on
+** the Amiga (OS 'A', or level 0 which has no OS field). Other systems put
+** MS-DOS attributes there, which LhA ignores (it shows "----rwed").
+*/
+static int amiga_attr(const struct lha_member *m)
+{
+ return m->level == 0 || m->os == 'A';
+}
+
 static uint8_t lhaf_get_protection(ENTRY *e)
 {
- return ((struct lha_member *)e)->attr;
+ struct lha_member *m = e;
+ return amiga_attr(m) ? m->attr : 0;   /* 0: rwed allowed, nothing else set */
 }
 
 static void lhaf_set_protection(ENTRY *e, uint8_t prot)
 {
  struct lha_member *m = e;
- if(m->attr != prot)
+ if(!amiga_attr(m))
+ {
+  /* make LhA use the new bits; extended headers of the other system
+     (Unix permissions etc) are kept for its own tools */
+  m->os = 'A';
+  m->attr = prot;
+  m->modified = 1;
+ }
+ else if(m->attr != prot)
  {
   m->attr = prot;
   m->modified = 1;

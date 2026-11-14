@@ -65,6 +65,16 @@ note, `0x40` attributes (2 bytes, the protection in the first), `0x00`
 header CRC (over the whole header, field 0). The total size's low byte must
 not be 0 (it would read as the end marker); a padding byte is added then.
 
+## Archives from other systems
+
+Other archivers (LHa for UNIX, MS-DOS LHA) write MS-DOS attributes into
+the attribute byte (LHa for UNIX: `0x20`) and their own permissions in
+extended headers (`0x50` Unix mode, `0x51` owner, `0x54` time). LhA 2.15
+ignores the attribute byte of such entries and shows `----rwed`.
+arcedit therefore treats their protection as `----rwed`, and when PROTECT
+changes it, marks the entry as Amiga (OS `A`) so LhA uses the new bits.
+The other system's extended headers are kept.
+
 ## CRC
 
 CRC-16 with polynomial `0xA001` (reflected), start value 0, for both data

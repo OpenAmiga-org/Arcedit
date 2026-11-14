@@ -59,7 +59,8 @@ of memory.
 
 ```
 make            # host build (bin/arcedit), used by the tests
-make test       # host tests, checked with lha (Lhasa) and tests/lhainfo.py
+make test       # host tests, checked with lha (Lhasa), tests/lhainfo.py and,
+                # when it's there, LHa for UNIX (LHAUNIX=/path/to/lha)
 make os4        # AmigaOS 4 build (bin/os4/arcedit) in the walkero/amigagccondocker image
 ```
 

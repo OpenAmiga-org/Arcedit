@@ -130,5 +130,30 @@ check "not an archive" "[ \$? -eq 10 ]"
 $AE $W/a.lha x DELETE COMMENT y QUIET >/dev/null
 check "two operations refused" "[ \$? -eq 10 ]"
 
+# Archives made by LHa for UNIX (level 2, Unix extended headers), when that
+# tool is there: edits keep its headers, packing is close to its own
+LHAUNIX=${LHAUNIX:-/home/claude/linux_archivers/lha/lha}
+if [ -x "$LHAUNIX" ]; then
+ (cd $W && "$LHAUNIX" -ao5q u.lha in/text.txt in/deep/er/source.c in/deep/er/one in/emptyfile)
+ cp $W/u.lha $W/e.lha
+ $AE $W/e.lha in/text.txt COMMENT "unix note" QUIET
+ $AE $W/e.lha RENAME in/deep AS in/Deep QUIET
+ $AE $W/e.lha in/emptyfile DELETE QUIET
+ $AE $W/e.lha ADD src/lha.h TO in QUIET
+ check "unix: lha -t" "\"$LHAUNIX\" -t $W/e.lha >/dev/null 2>&1"
+ check "unix: comment" "$INFO $W/e.lha | grep -q '^in/text.txt|.*|unix note\$'"
+ check "unix: unix headers kept" "\"$LHAUNIX\" -v $W/e.lha | grep -q '1000/1000.*in/Deep/er/source.c'"
+ rm -rf $W/ux && mkdir -p $W/ux && (cd $W/ux && "$LHAUNIX" -xq ../e.lha)
+ check "unix: data" "cmp -s $W/in/text.txt $W/ux/in/text.txt && cmp -s $W/in/deep/er/source.c $W/ux/in/Deep/er/source.c && cmp -s src/lha.h $W/ux/in/lha.h"
+ # protection of a non-Amiga entry: starts from ----rwed, entry becomes Amiga
+ $AE $W/e.lha in/Deep/er/one PROTECT +s QUIET
+ check "unix: protect" "$INFO $W/e.lha | grep -q '^in/Deep/er/one|2|-lh0-|-s--rwed|'"
+ # packing within 1% of LHa for UNIX -o5 on the same files
+ (cd $W && "$LHAUNIX" -ao5q ref.lha in/deep/er/source.c && $AE ae.lha ADD in/deep/er/source.c QUIET)
+ check "unix: packing close to lha" "[ \$(stat -c %s $W/ae.lha) -le \$(( \$(stat -c %s $W/ref.lha) * 101 / 100 + 64 )) ]"
+else
+ echo "(LHa for UNIX not found at $LHAUNIX, its tests skipped)"
+fi
+
 echo "passed $pass, failed $fail"
 [ $fail -eq 0 ]
