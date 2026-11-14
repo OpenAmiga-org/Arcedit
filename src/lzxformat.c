@@ -189,14 +189,15 @@ static ARC *lzx_open(const char *path, int create, int *err)
   e->psize = rd32le(h + 6);
   e->merged = (h[12] & 1) != 0;
   e->dataoff = off + HDR + h[30] + h[14];
-  /* group: a run of entries up to and including the one carrying data */
-  if(groupstart == NULL)
+  /* group: merged entries up to and including the one carrying the
+     group's data; an entry that isn't merged is a group of its own */
+  if(groupstart == NULL || !e->merged)
   {
    groupstart = e;
    group++;
   }
   e->group = group;
-  if(e->psize) groupstart = NULL;
+  if(e->psize || !e->merged) groupstart = NULL;
   off = e->dataoff + (long)e->psize;
  }
  *err = LZX_OK;

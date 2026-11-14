@@ -334,6 +334,26 @@ rm -rf $W/lx && mkdir -p $W/lx && (cd $W/lx && unar -q -D ../a.lzx)
 check "lzx add stored" "lzxtest $W/a.lzx && cmp -s $W/in/deep/er/source.c $W/lx/added/source.c"
 $AE $W/new.lzx ADD $W/in/text.txt QUIET >/dev/null
 check "lzx new refused" "[ \$? -eq 10 ]"
+# archives made by LZX 1.21 (real_lzA: merged group + drawer entry,
+# real_lzB: SYS:S packed -3, real_lzC: stored)
+cp tests/samples/real_lzA.lzx $W/a.lzx
+$AE $W/a.lzx sub/c.txt COMMENT "merged note" QUIET
+$AE $W/a.lzx sub/b.txt PROTECT +p QUIET
+$AE $W/a.lzx RENAME sub AS Drawer QUIET
+$AE $W/a.lzx empty DELETE QUIET
+check "real lzx edits" "lzxtest $W/a.lzx && $XI $W/a.lzx | grep -q '^Drawer/c.txt|.*|1|merged note\$' && $XI $W/a.lzx | grep -q '^Drawer/b.txt|--p-r-ed|' && ! $XI $W/a.lzx | grep -q '^empty'"
+$AE $W/a.lzx Drawer/d.txt DELETE QUIET >/dev/null
+check "real lzx partial group refused" "[ \$? -eq 10 ]"
+$AE $W/a.lzx a.txt Drawer DELETE QUIET
+check "real lzx whole group" "lzxtest $W/a.lzx && [ \$($XI $W/a.lzx | wc -l) -eq 0 ]"
+cp tests/samples/real_lzB.lzx $W/b.lzx
+$AE $W/b.lzx RENAME S AS Scripts QUIET
+check "real lzx packed rename" "lzxtest $W/b.lzx && [ \$($XI $W/b.lzx | grep -c '^Scripts/') -eq 19 ]"
+cp tests/samples/real_lzC.lzx $W/c.lzx
+$AE $W/c.lzx sub/b.txt DELETE QUIET
+$AE $W/c.lzx ADD $W/in/deep/er/source.c QUIET
+rm -rf $W/lx && mkdir -p $W/lx && (cd $W/lx && unar -q -D ../c.lzx)
+check "real lzx stored delete+add" "lzxtest $W/c.lzx && cmp -s $W/in/deep/er/source.c $W/lx/source.c && ! $XI $W/c.lzx | grep -q '^sub/b.txt'"
 
 echo "passed $pass, failed $fail"
 [ $fail -eq 0 ]

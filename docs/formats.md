@@ -70,9 +70,11 @@ taken as `----rwed`, and PROTECT marks them as Amiga entries.
   together); removing part of a group would need repacking and is
   refused. ADD stores files (the LZX packing method is only known from
   unpacking code). New LZX archives aren't created.
-- Tested with constructed archives (stored entries, a stored merged
-  group) checked with unar and xadmaster. A stored merged group is
-  probably something LZX never writes: xadmaster's client reports a wrong
-  checksum for its second member while unar reads it, but arcedit only
-  copies such data. Real LZX archives (packed, merged) haven't been tried
-  yet.
+- Tested with archives made by LZX 1.21 (a merged packed group, an empty
+  drawer entry, SYS:S packed at -3, a stored archive): after arcedit's
+  edits LZX itself tests them OK ("all files OK"), and xadmaster and unar
+  extract them. LZX reads the dates arcedit writes correctly; LZX 1.21's
+  own dates for recent years are off (it writes 1990 for 2026).
+- A stored merged group (constructed, `tests/mklzx.py`) is probably never
+  written by LZX: xadmaster reports a wrong checksum for its second member
+  while unar reads it. arcedit only copies such data.
