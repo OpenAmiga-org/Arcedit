@@ -47,17 +47,10 @@ taken as `----rwed`, and PROTECT marks them as Amiga entries.
 
 ## RAR
 
-- RAR 5 only (RAR 4 is reported and refused). Header editing: rename,
-  protection (Unix mode or Windows read-only), delete, and ADD as stored
-  files. All packed data is copied as it is.
-- arcedit doesn't pack RAR: the method isn't documented, and the UnRAR
-  source license forbids using it to make a RAR compressor. Creating new
-  RAR archives isn't offered either.
-- Solid archives: only rename and protection (later entries depend on
-  earlier ones). Encrypted headers and multi-volume archives are refused.
-  The quick open data and its locator are dropped on writing (their
-  offsets change); RAR rebuilds them the next time it changes the archive.
-- xadmaster has no RAR 5 client, so this was checked with unrar only.
+Not handled. arcedit only supports formats xadmaster.library reads (Filer
+browses archives with it), and xadmaster has no client for RAR 5, the
+format current RAR versions write. (A header-editing RAR 5 backend existed
+in commits d2e696f..d5b2c7e and was removed.)
 
 ## LZX
 

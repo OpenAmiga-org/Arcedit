@@ -14,18 +14,18 @@ released as public domain.
 | TAR (`.tar`) | yes | yes | pax comment | owner r w e | yes | yes | ustar, GNU long names, pax |
 | TGZ (`.tgz`, `.tar.gz`) | yes | yes | pax comment | owner r w e | packed | yes | unpacked to a temporary tar and packed again |
 | GZIP (`.gz`) | - | stored name | yes | - | replaces the file | yes | one file per `.gz` |
-| RAR 5 (`.rar`) | not solid | yes | - | Unix/Windows | stored | - | headers only; no RAR 4 |
 | LZX (`.lzx`) | not part of a merged group | yes | yes | yes | stored | - | headers only |
 
 `arcedit <archive> INFO` prints what the archive allows, for example
 `ZIP: DELETE RENAME COMMENT PROTECT ADD`; an operation the archive doesn't
-allow is refused before anything is written. `.bz2` and `.xz` hold one
-stream without names or other fields, so there's nothing for arcedit to
-edit there. Details per format: `docs/formats.md`.
+allow is refused before anything is written. Only formats that
+xadmaster.library reads are handled (Filer browses archives with it), so
+there is no RAR support (xadmaster has no RAR 5 client); `.bz2` and `.xz`
+hold one stream without names or other fields, so there's nothing to edit. Details per format: `docs/formats.md`.
 
 ## How it works
 
-Archives like LHA, ZIP, RAR and LZX are lists of members, each a header
+Archives like LHA, ZIP and LZX are lists of members, each a header
 followed by that file's own packed data. Every member is packed on its own,
 so (LHA as the example):
 
@@ -77,7 +77,7 @@ of memory.
 ```
 make            # host build (bin/arcedit), used by the tests
 make test       # host tests: results checked with Lhasa, unzip, GNU tar,
-                # bsdtar, gzip, unrar, unar (lsar) and the small readers in
+                # bsdtar, gzip, unar (lsar) and the small readers in
                 # tests/*info.py; LHa for UNIX when it's there (LHAUNIX=)
 make os4        # AmigaOS 4 build (bin/os4/arcedit) in the walkero/amigagccondocker image
 ```
@@ -92,7 +92,7 @@ make os4        # AmigaOS 4 build (bin/os4/arcedit) in the walkero/amigagccondoc
 | `src/lha.c`, `src/lha.h` | LHA archive model: headers, reading, writing |
 | `src/lh5enc.c` | `-lh5-` compressor |
 | `src/deflate.c` | Deflate compressor and decompressor (RFC 1951), CRC-32 |
-| `src/zipformat.c`, `src/tarformat.c`, `src/gzformat.c`, `src/rarformat.c`, `src/lzxformat.c` | The other format backends |
+| `src/zipformat.c`, `src/tarformat.c`, `src/gzformat.c`, `src/lzxformat.c` | The other format backends |
 | `src/platform.c` | File system calls (AmigaOS 4 and POSIX for the tests) |
 | `docs/lha_format.md` | The LHA header details arcedit relies on |
 | `docs/formats.md` | How each format is handled, and its limits |

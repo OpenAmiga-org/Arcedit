@@ -67,7 +67,6 @@ static const struct arc_format *Formats[] =
  &ZipFormat,
  &TarFormat,
  &GzFormat,
- &RarFormat,
  &LzxFormat,
  NULL
 };
