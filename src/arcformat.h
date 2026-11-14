@@ -75,5 +75,6 @@ struct arc_format
 
 extern const struct arc_format LhaFormat;
 extern const struct arc_format ZipFormat;
+extern const struct arc_format TarFormat;
 
 #endif

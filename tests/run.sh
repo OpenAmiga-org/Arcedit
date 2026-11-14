@@ -198,5 +198,50 @@ check "zip new empty drawer" "[ -d $W/zx/in/empty ]"
 check "zip new random stored" "$ZI $W/new.zip | grep -q '^in/random.bin|1|.*|0|'"
 check "zip info" "$AE $W/new.zip INFO | grep -q '^ZIP: DELETE RENAME COMMENT PROTECT ADD'"
 
+# ---------------------------------------------------------------- TAR
+TI="python3 $PWD/tests/tarinfo.py"
+tartest() { tar -tf "$1" >/dev/null 2>&1 && bsdtar -tf "$1" >/dev/null 2>&1 && $TI "$1" >/dev/null 2>&1; }
+LONG=sub/$(printf 'd%.0s' $(seq 1 60))/$(printf 'e%.0s' $(seq 1 50))   # the long drawer in the samples
+for t in t_gnu t_pax t_ustar; do
+ S=tests/samples/$t.tar
+ cp $S $W/a.tar
+ $AE $W/a.tar a.txt COMMENT "tar note" QUIET
+ check "$t comment" "$TI $W/a.tar | grep -q '^a.txt|.*|tar note\$'"
+ check "$t comment tar -t" "tartest $W/a.tar"
+ $AE $W/a.tar sub/b.txt PROTECT rw QUIET
+ check "$t protect" "$TI $W/a.tar | grep -q '^sub/b.txt|640|'"
+ $AE $W/a.tar sub/b.txt PROTECT +e QUIET
+ check "$t protect +e" "$TI $W/a.tar | grep -q '^sub/b.txt|740|'"
+ cp $S $W/a.tar
+ $AE $W/a.tar RENAME a.txt AS docs/first.txt QUIET
+ $AE $W/a.tar RENAME sub AS other QUIET
+ check "$t rename" "$TI $W/a.tar | grep -q '^docs/first.txt|' && $TI $W/a.tar | grep -q '^other/b.txt|' && ! $TI $W/a.tar | grep -q '^sub'"
+ check "$t rename tar -t" "tartest $W/a.tar"
+ rm -rf $W/tx && mkdir -p $W/tx && tar -xf $W/a.tar -C $W/tx
+ check "$t rename data" "grep -q 'hello world' $W/tx/docs/first.txt && grep -q 'second file' $W/tx/other/b.txt"
+ cp $S $W/a.tar
+ $AE $W/a.tar sub DELETE QUIET
+ check "$t delete drawer" "! $TI $W/a.tar | grep -q '^sub' && $TI $W/a.tar | grep -q '^a.txt|'"
+ check "$t delete tar -t" "tartest $W/a.tar"
+ $AE $W/a.tar ADD $W/in/deep/er/source.c TO added QUIET
+ rm -rf $W/tx && mkdir -p $W/tx && tar -xf $W/a.tar -C $W/tx
+ check "$t add data" "cmp -s $W/in/deep/er/source.c $W/tx/added/source.c"
+done
+# long names: rename into a name longer than 100 characters and back
+cp tests/samples/t_gnu.tar $W/a.tar
+$AE $W/a.tar RENAME a.txt AS "$LONG/renamed-$(printf 'x%.0s' $(seq 1 60)).txt" QUIET
+check "tar long rename" "$TI $W/a.tar | grep -q 'renamed-xxxx' && tartest $W/a.tar"
+rm -rf $W/tx && mkdir -p $W/tx && tar -xf $W/a.tar -C $W/tx
+check "tar long rename data" "grep -q 'hello world' $W/tx/$LONG/renamed-*.txt && grep -q deep $W/tx/$LONG/long.txt"
+# a new tar of the test tree
+$AE $W/new.tar ADD $W/in QUIET
+check "tar new archive" "tartest $W/new.tar"
+rm -rf $W/tx && mkdir -p $W/tx && tar -xf $W/new.tar -C $W/tx
+for f in random.bin text.txt zeros.bin deep/binary emptyfile deep/er/one deep/er/source.c; do
+ check "tar new data $f" "cmp -s $W/in/$f $W/tx/in/$f"
+done
+check "tar new empty drawer" "[ -d $W/tx/in/empty ]"
+check "tar info" "$AE $W/new.tar INFO | grep -q '^TAR: DELETE RENAME COMMENT PROTECT ADD'"
+
 echo "passed $pass, failed $fail"
 [ $fail -eq 0 ]

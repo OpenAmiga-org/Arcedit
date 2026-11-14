@@ -65,6 +65,7 @@ static const struct arc_format *Formats[] =
 {
  &LhaFormat,
  &ZipFormat,
+ &TarFormat,
  NULL
 };
 
@@ -638,7 +639,7 @@ int main(int argc, char **argv)
  f = find_format(archive, args[ARG_ADD] != NULL, &exists);
  if(f == NULL)
  {
-  if(exists) printf("%s: not an archive type arcedit knows (LHA)\n", archive);
+  if(exists) printf("%s: not an archive type arcedit knows\n", archive);
   else printf("%s: no such archive\n", archive);
   goto done;
  }
