@@ -4,14 +4,30 @@ Edit archives without unpacking them. An AmigaOS 4 command that renames,
 deletes, adds and changes the comment and protection bits of archive
 entries.
 
-Supported formats: **LHA** (`.lha`, `.lzh`, header levels 0, 1 and 2,
-including self-extracting archives). The format code sits behind a small
-interface (`src/arcformat.h`) so more archive types can be added.
+Every format is written in arcedit's own code, so the whole project can be
+released as public domain.
+
+| Format | DELETE | RENAME | COMMENT | PROTECT | ADD | New archive | Notes |
+|---|---|---|---|---|---|---|---|
+| LHA (`.lha`, `.lzh`) | yes | yes | yes | yes | packed (`-lh5-`) | yes | header levels 0-2, self-extracting |
+| ZIP (`.zip`) | yes | yes | yes | yes | packed (Deflate) | yes | Info-ZIP Amiga attributes; no ZIP64 |
+| TAR (`.tar`) | yes | yes | pax comment | owner r w e | yes | yes | ustar, GNU long names, pax |
+| TGZ (`.tgz`, `.tar.gz`) | yes | yes | pax comment | owner r w e | packed | yes | unpacked to a temporary tar and packed again |
+| GZIP (`.gz`) | - | stored name | yes | - | replaces the file | yes | one file per `.gz` |
+| RAR 5 (`.rar`) | not solid | yes | - | Unix/Windows | stored | - | headers only; no RAR 4 |
+| LZX (`.lzx`) | not part of a merged group | yes | yes | yes | stored | - | headers only |
+
+`arcedit <archive> INFO` prints what the archive allows, for example
+`ZIP: DELETE RENAME COMMENT PROTECT ADD`; an operation the archive doesn't
+allow is refused before anything is written. `.bz2` and `.xz` hold one
+stream without names or other fields, so there's nothing for arcedit to
+edit there. Details per format: `docs/formats.md`.
 
 ## How it works
 
-An LHA archive is a list of members, each a header followed by that file's
-own compressed data. Every member is packed on its own, so:
+Archives like LHA, ZIP, RAR and LZX are lists of members, each a header
+followed by that file's own packed data. Every member is packed on its own,
+so (LHA as the example):
 
 - **delete** copies the other members byte for byte and leaves the deleted
   ones out,
@@ -27,7 +43,7 @@ the archive keeps its own protection bits and file note.
 ## Usage
 
 ```
-arcedit ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/K,FROM=LIST/K,QUIET/S
+arcedit ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/K,FROM=LIST/K,INFO/S,QUIET/S
 ```
 
 | Command | Does |
@@ -40,6 +56,7 @@ arcedit ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/
 | `arcedit Work:a.lha docs/a.txt PROTECT rwed` | Set the protection bits exactly |
 | `arcedit Work:a.lha docs/a.txt PROTECT +s-d` | Add or remove protection bits (`hsparwed`) |
 | `arcedit Work:a.lha ADD RAM:x RAM:Drawer TO docs` | Add files and drawers (with their contents) below `docs` |
+| `arcedit Work:a.zip INFO` | Show the format and the operations it allows |
 
 - Entry names are archive paths with `/` between drawers, matched without
   regard to case.
@@ -59,8 +76,9 @@ of memory.
 
 ```
 make            # host build (bin/arcedit), used by the tests
-make test       # host tests, checked with lha (Lhasa), tests/lhainfo.py and,
-                # when it's there, LHa for UNIX (LHAUNIX=/path/to/lha)
+make test       # host tests: results checked with Lhasa, unzip, GNU tar,
+                # bsdtar, gzip, unrar, unar (lsar) and the small readers in
+                # tests/*info.py; LHa for UNIX when it's there (LHAUNIX=)
 make os4        # AmigaOS 4 build (bin/os4/arcedit) in the walkero/amigagccondocker image
 ```
 
@@ -73,6 +91,9 @@ make os4        # AmigaOS 4 build (bin/os4/arcedit) in the walkero/amigagccondoc
 | `src/lhaformat.c` | LHA backend for that interface |
 | `src/lha.c`, `src/lha.h` | LHA archive model: headers, reading, writing |
 | `src/lh5enc.c` | `-lh5-` compressor |
+| `src/deflate.c` | Deflate compressor and decompressor (RFC 1951), CRC-32 |
+| `src/zipformat.c`, `src/tarformat.c`, `src/gzformat.c`, `src/rarformat.c`, `src/lzxformat.c` | The other format backends |
 | `src/platform.c` | File system calls (AmigaOS 4 and POSIX for the tests) |
 | `docs/lha_format.md` | The LHA header details arcedit relies on |
+| `docs/formats.md` | How each format is handled, and its limits |
 | `tests/` | Host tests and sample archives made by LhA 2.15 |

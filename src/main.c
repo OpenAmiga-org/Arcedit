@@ -68,6 +68,7 @@ static const struct arc_format *Formats[] =
  &TarFormat,
  &GzFormat,
  &RarFormat,
+ &LzxFormat,
  NULL
 };
 
@@ -713,7 +714,7 @@ int main(int argc, char **argv)
   arc = NULL;
   if(err)
   {
-   printf("%s: %s\n", tmp, f->error_text(err));
+   printf("%s: %s; the archive was not changed\n", archive, f->error_text(err));
    plat_delete(tmp);
    rc = RETURN_ERROR;
   }

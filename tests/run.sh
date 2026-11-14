@@ -311,5 +311,29 @@ fi
 $AE $W/new.rar ADD $W/in/text.txt QUIET >/dev/null
 check "rar new refused" "[ \$? -eq 10 ]"
 
+# ---------------------------------------------------------------- LZX
+XI="python3 $PWD/tests/lzxinfo.py"
+lzxtest() { lsar -t "$1" 2>&1 | grep -q ' 0 failed' && $XI "$1" >/dev/null 2>&1; }
+S=tests/samples/x_mix.lzx
+cp $S $W/a.lzx
+$AE $W/a.lzx a.txt COMMENT "lzx note" QUIET
+$AE $W/a.lzx sub/b.txt PROTECT +s-r QUIET
+$AE $W/a.lzx RENAME m AS merged QUIET
+check "lzx header edits" "lzxtest $W/a.lzx && $XI $W/a.lzx | grep -q '^a.txt|.*|lzx note\$' && $XI $W/a.lzx | grep -q '^sub/b.txt|-s----ed|' && $XI $W/a.lzx | grep -q '^merged/two.txt|.*|1|'"
+rm -rf $W/lx && mkdir -p $W/lx && (cd $W/lx && unar -q -D ../a.lzx)
+check "lzx data after edits" "grep -q 'merged two' $W/lx/merged/two.txt && grep -q 'hello world' $W/lx/a.txt"
+$AE $W/a.lzx merged/one.txt DELETE QUIET >/dev/null
+check "lzx part of merged group refused" "[ \$? -eq 10 ] && $XI $W/a.lzx | grep -q '^merged/one.txt|'"
+check "lzx no temp file left" "! ls $W/a.lzx.arcedit >/dev/null 2>&1"
+$AE $W/a.lzx merged DELETE QUIET
+check "lzx whole merged group" "lzxtest $W/a.lzx && ! $XI $W/a.lzx | grep -q '^merged/'"
+$AE $W/a.lzx sub/b.txt DELETE QUIET
+check "lzx delete" "lzxtest $W/a.lzx && [ \$($XI $W/a.lzx | wc -l) -eq 1 ]"
+$AE $W/a.lzx ADD $W/in/deep/er/source.c TO added QUIET
+rm -rf $W/lx && mkdir -p $W/lx && (cd $W/lx && unar -q -D ../a.lzx)
+check "lzx add stored" "lzxtest $W/a.lzx && cmp -s $W/in/deep/er/source.c $W/lx/added/source.c"
+$AE $W/new.lzx ADD $W/in/text.txt QUIET >/dev/null
+check "lzx new refused" "[ \$? -eq 10 ]"
+
 echo "passed $pass, failed $fail"
 [ $fail -eq 0 ]

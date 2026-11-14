@@ -81,5 +81,6 @@ extern const struct arc_format ZipFormat;
 extern const struct arc_format TarFormat;
 extern const struct arc_format GzFormat;
 extern const struct arc_format RarFormat;
+extern const struct arc_format LzxFormat;
 
 #endif

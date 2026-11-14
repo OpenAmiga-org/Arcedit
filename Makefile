@@ -4,7 +4,7 @@
 #   make test       run the host tests (needs lha, LHa for UNIX)
 #   make os4        AmigaOS 4 build in the walkero docker (bin/os4/arcedit)
 
-SRC = src/main.c src/lha.c src/lh5enc.c src/lhaformat.c src/deflate.c src/zipformat.c src/tarformat.c src/gzformat.c src/rarformat.c src/platform.c
+SRC = src/main.c src/lha.c src/lh5enc.c src/lhaformat.c src/deflate.c src/zipformat.c src/tarformat.c src/gzformat.c src/rarformat.c src/lzxformat.c src/platform.c
 HDR = src/arcformat.h src/lha.h src/deflate.h src/tar.h src/platform.h
 
 CFLAGS = -O2 -Wall -Wextra -std=gnu99
