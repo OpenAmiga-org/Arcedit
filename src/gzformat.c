@@ -196,7 +196,7 @@ static ARC *gz_open(const char *path, int create, int *err)
   if(is_tar_name(path))
   {
    int e;
-   snprintf(g->tarname, sizeof(g->tarname), "%s.arcedit-tar", path);
+   plat_temp_name(path, g->tarname, sizeof(g->tarname));
    g->tar = tar_open_file(g->tarname, 1, &e);
    if(g->tar == NULL)
    {
@@ -318,7 +318,7 @@ static ARC *gz_open(const char *path, int create, int *err)
     *err = GZ_ERR_SPACE;
     goto fail;
    }
-   snprintf(g->tarname, sizeof(g->tarname), "%s.arcedit-tar", path);
+   plat_temp_name(path, g->tarname, sizeof(g->tarname));
    t = fopen(g->tarname, "wb");
    if(t == NULL || fwrite(plain, 1, plainlen, t) != plainlen)
    {
@@ -411,7 +411,7 @@ static int gz_write(ARC *arc, const char *path)
   char tmp[1100];
   uint8_t *buf, *packed;
   uint32_t len, plen;
-  snprintf(tmp, sizeof(tmp), "%s.arcedit-tar2", g->archive);
+  plat_temp_name(g->archive, tmp, sizeof(tmp));
   err = tar_write_file(g->tar, tmp);
   if(err)
   {
@@ -455,7 +455,7 @@ static int gz_write(ARC *arc, const char *path)
    while(left > 0 && !err)
    {
     size_t n = left > 64 * 1024 ? 64 * 1024 : (size_t)left;
-    if(fread(copy, 1, n, g->fh) != n || fwrite(copy, 1, n, out) != n) err = GZ_ERR_IO;
+    if(plat_break() || fread(copy, 1, n, g->fh) != n || fwrite(copy, 1, n, out) != n) err = GZ_ERR_IO;
     left -= (long)n;
    }
    free(copy);

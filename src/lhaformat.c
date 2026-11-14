@@ -15,11 +15,16 @@
 static int lhaf_probe(const uint8_t *head, uint32_t len)
 {
  uint32_t off;
+ /* an empty archive: just the end byte */
+ if(len == 1 && head[0] == 0) return 1;
+ /* code in front of the first header only in self-extracting archives */
+ if(len >= 22 && !lha_looks_like_header(head) &&
+    !(head[0] == 0 && head[1] == 0 && head[2] == 3 && head[3] == 0xF3) && !(head[0] == 'M' && head[1] == 'Z')) return 0;
  /* a header at the start, or after the code of a self-extracting archive */
  for(off = 0; off + 22 <= len; off++)
  {
   const uint8_t *p = head + off;
-  if(p[2] == '-' && p[3] == 'l' && (p[4] == 'h' || p[4] == 'z') && p[6] == '-' && p[20] <= 2) return off == 0 ? 2 : 1;
+  if(lha_looks_like_header(p)) return off == 0 ? 2 : 1;
  }
  return 0;
 }

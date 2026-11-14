@@ -33,6 +33,7 @@
 #include "arcformat.h"
 #include "deflate.h"  /* crc32_update */
 #include "lha.h"      /* lha_pathcmp */
+#include "platform.h"
 
 #define LZX_OK         0
 #define LZX_ERR_IO     1
@@ -290,7 +291,7 @@ static int lzx_write(ARC *arc, const char *path)
   while(left && !err)
   {
    uint32_t n = left > 64 * 1024 ? 64 * 1024 : left;
-   if(fread(copy, 1, n, z->fh) != n || fwrite(copy, 1, n, out) != n) err = LZX_ERR_IO;
+   if(plat_break() || fread(copy, 1, n, z->fh) != n || fwrite(copy, 1, n, out) != n) err = LZX_ERR_IO;
    left -= n;
   }
  }

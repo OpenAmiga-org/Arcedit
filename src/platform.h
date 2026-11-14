@@ -59,4 +59,11 @@ int plat_free_space(const char *path, uint64_t *bytes);
 /* Size of a file, 0 when it can't be examined */
 uint64_t plat_size(const char *path);
 
+/* A unique temporary file name in the drawer of path, short enough for
+   any file system (FFS: 30 characters) */
+void plat_temp_name(const char *path, char *buf, uint32_t size);
+
+/* TRUE once the user pressed Ctrl-C (stays TRUE) */
+int plat_break(void);
+
 #endif

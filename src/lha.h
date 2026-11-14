@@ -79,6 +79,9 @@ struct lha_archive
 
 const char *lha_error_text(int err);
 
+/* TRUE if 22 bytes look like the start of a member header */
+int lha_looks_like_header(const uint8_t *p);
+
 uint16_t lha_crc16(uint16_t crc, const uint8_t *buf, uint32_t len);
 
 /* Open and read an archive. A missing file gives an empty archive when

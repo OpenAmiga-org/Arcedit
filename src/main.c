@@ -18,8 +18,9 @@
 **                                                 (replaces existing entries)
 **
 **  Unchanged entries are copied as they are, only added files are packed.
-**  The archive is written to a temporary file first and replaces the
-**  original only when everything worked.
+**  The archive is written to a temporary file in the same drawer first
+**  (a short name, aeXXXXXXXX.tmp) and replaces the original only when
+**  everything worked. Ctrl-C stops it before the replace.
 **
 **  Return codes: 0 OK, 5 some entries weren't found, 10 nothing was done
 **  (bad arguments, archive errors), 20 out of memory.
@@ -450,6 +451,12 @@ static int add_path(struct adder *a, const char *local, const char *archpath);
 static int add_scan_entry(const char *name, void *userdata)
 {
  struct adder *a = userdata;
+ if(plat_break())
+ {
+  error("interrupted; the archive was not changed");
+  a->error = 1;
+  return -1;
+ }
  char local[1024], archpath[1024];
  plat_join(local, sizeof(local), a->local, name);
  snprintf(archpath, sizeof(archpath), "%s%s", a->prefix, name);
@@ -549,6 +556,7 @@ static int do_add(const struct arc_format *f, ARC *arc, const char *archive, str
  for(i = 0; i < n->count; i++)
  {
   char archpath[1024];
+  if(plat_break()) return RETURN_ERROR;
   snprintf(archpath, sizeof(archpath), "%s%s", prefix, plat_filepart(n->name[i]));
   {
    /* a volume or assign ("RAM:") adds what it holds */
@@ -787,11 +795,19 @@ int main(int argc, char **argv)
    rc = RETURN_ERROR;
    goto done;
   }
-  snprintf(tmp, sizeof(tmp), "%s.arcedit", archive);
-  err = f->write(arc, tmp);
+  plat_temp_name(archive, tmp, sizeof(tmp));
+  err = plat_break() ? 0 : f->write(arc, tmp);
   f->close(arc);
   arc = NULL;
-  if(err)
+  /* Ctrl-C until here leaves the archive as it was; the replace below
+     is not interrupted */
+  if(plat_break())
+  {
+   error("interrupted; the archive was not changed");
+   plat_delete(tmp);
+   rc = RETURN_ERROR;
+  }
+  else if(err)
   {
    error("%s; the archive was not changed", f->error_text(err));
    plat_delete(tmp);

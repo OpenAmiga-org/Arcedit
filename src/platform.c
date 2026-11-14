@@ -169,9 +169,28 @@ uint64_t plat_size(const char *path)
  return size;
 }
 
+static uint32_t TempCount;
+
+void plat_temp_name(const char *path, char *buf, uint32_t size)
+{
+ char name[32];
+ uint32_t id = (uint32_t)IExec->FindTask(NULL) ^ (++TempCount * 0x9E3779B9u);
+ parent_of(path, buf, size);
+ snprintf(name, sizeof(name), "ae%08lx.tmp", (unsigned long)id);
+ IDOS->AddPart(buf, name, size);
+}
+
+int plat_break(void)
+{
+ static int broken = 0;
+ if(!broken && (IExec->SetSignal(0, SIGBREAKF_CTRL_C) & SIGBREAKF_CTRL_C)) broken = 1;
+ return broken;
+}
+
 #else  /* host build (POSIX) */
 
 #include <dirent.h>
+#include <signal.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
@@ -279,6 +298,34 @@ uint64_t plat_size(const char *path)
 {
  struct stat st;
  return stat(path, &st) == 0 ? (uint64_t)st.st_size : 0;
+}
+
+static uint32_t TempCount;
+
+void plat_temp_name(const char *path, char *buf, uint32_t size)
+{
+ char dir[1024];
+ parent_of(path, dir, sizeof(dir));
+ snprintf(buf, size, "%s/ae%08lx.tmp", dir, (unsigned long)((uint32_t)getpid() ^ (++TempCount * 0x9E3779B9u)));
+}
+
+static volatile sig_atomic_t Broken;
+
+static void on_sigint(int sig)
+{
+ (void)sig;
+ Broken = 1;
+}
+
+int plat_break(void)
+{
+ static int installed = 0;
+ if(!installed)
+ {
+  signal(SIGINT, on_sigint);
+  installed = 1;
+ }
+ return Broken;
 }
 
 #endif

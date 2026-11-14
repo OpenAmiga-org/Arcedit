@@ -29,6 +29,7 @@
 #include "arcformat.h"
 #include "deflate.h"
 #include "lha.h"      /* lha_unix_to_dos, lha_pathcmp */
+#include "platform.h"
 
 #define ZIP_OK         0
 #define ZIP_ERR_IO     1
@@ -408,7 +409,7 @@ static int zip_write(ARC *arc, const char *path)
     while(left && !err)
     {
      uint32_t n = left > 64 * 1024 ? 64 * 1024 : left;
-     if(fread(copy, 1, n, z->fh) != n) err = ZIP_ERR_IO;
+     if(plat_break() || fread(copy, 1, n, z->fh) != n) err = ZIP_ERR_IO;
      else err = put_bytes(out, copy, n, &pos);
      left -= n;
     }
@@ -422,7 +423,7 @@ static int zip_write(ARC *arc, const char *path)
    while(left && !err)
    {
     uint32_t n = left > 64 * 1024 ? 64 * 1024 : left;
-    if(fread(copy, 1, n, z->fh) != n) err = ZIP_ERR_IO;
+    if(plat_break() || fread(copy, 1, n, z->fh) != n) err = ZIP_ERR_IO;
     else err = put_bytes(out, copy, n, &pos);
     left -= n;
    }

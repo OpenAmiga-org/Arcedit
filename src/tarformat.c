@@ -28,6 +28,7 @@
 #include "arcformat.h"
 #include "tar.h"
 #include "lha.h"      /* lha_pathcmp */
+#include "platform.h"
 
 #define BLOCK 512
 
@@ -176,6 +177,13 @@ void tar_close_file(ARC *arc)
 static int tar_probe(const uint8_t *head, uint32_t len)
 {
  if(len < BLOCK) return 0;
+ /* an empty archive: only the end blocks */
+ if(len >= 2 * BLOCK && len % BLOCK == 0)
+ {
+  uint32_t i;
+  for(i = 0; i < len && head[i] == 0; i++);
+  if(i == len) return 1;
+ }
  if(memcmp(head + 257, "ustar", 5) == 0 && getnum(head + 148, 8) == checksum(head)) return 2;
  /* old (v7) archives: only the checksum tells */
  if(head[0] && getnum(head + 148, 8) == checksum(head) && head[148] != 0) return 1;
@@ -273,18 +281,24 @@ ARC *tar_open_file(const char *path, int create, int *err)
    char *buf;
    if(getnum(h + 148, 8) != checksum(h))
    {
-    entry_free(e);
-    *err = TAR_ERR_FORMAT;
-    goto fail;
+    ok = 0;
+    break;
    }
    if(h[156] != 'x' && h[156] != 'L' && h[156] != 'K') break;
    size = getnum(h + 124, 12);
+   if(size > 1024 * 1024)   /* extension headers are small; this one is damaged */
+   {
+    ok = 0;
+    break;
+   }
    buf = malloc((size_t)size + 1);
    if(buf == NULL || fread(buf, 1, (size_t)size, t->fh) != size)
    {
     free(buf);
+    free(paxpath);
+    free(longname);
     entry_free(e);
-    *err = buf ? TAR_ERR_IO : TAR_ERR_MEM;
+    *err = buf ? TAR_ERR_FORMAT : TAR_ERR_MEM;
     goto fail;
    }
    buf[size] = 0;
@@ -526,7 +540,7 @@ int tar_write_file(ARC *arc, const char *path)
   while(left && err == TAR_OK)
   {
    size_t n = left > 64 * 1024 ? 64 * 1024 : (size_t)left;
-   if(fread(copy, 1, n, t->fh) != n || fwrite(copy, 1, n, out) != n) err = TAR_ERR_IO;
+   if(plat_break() || fread(copy, 1, n, t->fh) != n || fwrite(copy, 1, n, out) != n) err = TAR_ERR_IO;
    left -= n;
    pos += n;
   }

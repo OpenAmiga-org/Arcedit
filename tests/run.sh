@@ -338,5 +338,18 @@ check "error last line" "[ \$? -eq 10 ] && tail -1 $W/err.txt | grep -q '^Error:
 $AE $W/a.lzx nosuch DELETE > $W/err.txt
 check "warning rc 5" "[ \$? -eq 5 ] && grep -q '^Warning: nosuch' $W/err.txt"
 
+# Ctrl-C while a big archive is rewritten: original unchanged, no temp file
+mkdir -p $W/brk && head -c 400000000 /dev/zero > $W/brk/zeros && (cd $W/brk && zip -q -0 ../big.zip zeros && printf x > small && zip -q ../big.zip small)
+sum=$(md5sum < $W/big.zip)
+$AE $W/big.zip small DELETE > $W/brk.txt & pid=$!
+sleep 0.15; kill -INT $pid; wait $pid; brc=$?
+check "ctrl-c leaves archive" "[ $brc -eq 10 ] && [ \"\$(md5sum < $W/big.zip)\" = \"$sum\" ] && ! ls $W/ae*.tmp >/dev/null 2>&1 && grep -q 'interrupted' $W/brk.txt"
+rm -f $W/big.zip; rm -rf $W/brk
+# temporary names stay short (FFS: 30 characters) whatever the archive is called
+long=$W/$(printf 'n%.0s' $(seq 1 100)).lha
+cp tests/samples/h1.lha $long
+check "long archive name" "$AE $long a.txt COMMENT x QUIET && lha t $long >/dev/null 2>&1"
+rm -f $long
+
 echo "passed $pass, failed $fail"
 [ $fail -eq 0 ]

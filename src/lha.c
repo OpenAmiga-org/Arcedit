@@ -24,6 +24,7 @@
 #include <string.h>
 
 #include "lha.h"
+#include "platform.h"
 
 #define HDR_MAX 65536   /* largest header handled */
 
@@ -246,12 +247,13 @@ void lha_member_remove(struct lha_archive *arc, struct lha_member *m)
 }
 
 /*
-** TRUE if p (with at least 7 bytes) looks like the start of a header:
-** "-l??-" method at offset 2 and level 0..2 at offset 20
+** TRUE if p (22 bytes) looks like the start of a header: "-lh?-" or
+** "-lz?-" method at offset 2 and level 0..2 at offset 20. The format probe
+** uses the same test.
 */
-static int looks_like_header(const uint8_t *p)
+int lha_looks_like_header(const uint8_t *p)
 {
- return p[2] == '-' && p[3] == 'l' && p[6] == '-' && p[20] <= 2;
+ return p[2] == '-' && p[3] == 'l' && (p[4] == 'h' || p[4] == 'z') && p[6] == '-' && p[20] <= 2;
 }
 
 /*
@@ -332,7 +334,7 @@ static int read_member(FILE *fh, long off, struct lha_member **out)
   free(h);
   return LHA_OK;
  }
- if(got < 22 || !looks_like_header(h)) goto fail;
+ if(got < 22 || !lha_looks_like_header(h)) goto fail;
 
  m = calloc(1, sizeof(*m));
  if(m == NULL)
@@ -483,11 +485,20 @@ struct lha_archive *lha_open(const char *name, int create, int *err)
   return NULL;
  }
  got = fread(head, 1, 64 * 1024, arc->fh);
- if(got >= 22 && !looks_like_header(head))
+ if(got >= 22 && !lha_looks_like_header(head))
  {
+  /* code in front of the first header: only a self-extracting archive
+     (an Amiga or MS-DOS executable), else the first header is damaged */
+  if(!(head[0] == 0 && head[1] == 0 && head[2] == 3 && head[3] == 0xF3) && !(head[0] == 'M' && head[1] == 'Z'))
+  {
+   *err = LHA_ERR_FORMAT;
+   free(head);
+   lha_close(arc);
+   return NULL;
+  }
   for(off = 1; off + 22 <= (long)got; off++)
   {
-   if(looks_like_header(head + off)) break;
+   if(lha_looks_like_header(head + off)) break;
   }
   if(off + 22 > (long)got)
   {
@@ -753,7 +764,7 @@ int lha_write(struct lha_archive *arc, const char *name)
    while(left && err == LHA_OK)
    {
     size_t chunk = left > 64 * 1024 ? 64 * 1024 : left;
-    if(fread(copybuf, 1, chunk, arc->fh) != chunk || fwrite(copybuf, 1, chunk, out) != chunk) err = LHA_ERR_IO;
+    if(plat_break() || fread(copybuf, 1, chunk, arc->fh) != chunk || fwrite(copybuf, 1, chunk, out) != chunk) err = LHA_ERR_IO;
     left -= (uint32_t)chunk;
    }
   }
