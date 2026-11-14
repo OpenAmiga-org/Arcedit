@@ -276,5 +276,40 @@ rm -rf $W/tx && mkdir -p $W/tx && tar -xzf $W/new.tar.gz -C $W/tx
 check "tgz new" "cmp -s $W/in/deep/binary $W/tx/in/deep/binary && cmp -s $W/in/text.txt $W/tx/in/text.txt"
 check "tgz info" "$AE $W/a.tgz INFO | grep -q '^TGZ: DELETE RENAME COMMENT PROTECT ADD'"
 
+# ---------------------------------------------------------------- RAR (5)
+rartest() { unrar t "$1" 2>&1 | grep -q '^All OK'; }
+for r in r_plain r_big; do
+ S=tests/samples/$r.rar
+ cp $S $W/a.rar
+ first=$(unrar lb $S | head -1)
+ $AE $W/a.rar RENAME "$first" AS renamed/first QUIET
+ check "$r rename" "rartest $W/a.rar && unrar lb $W/a.rar | grep -q '^renamed/first\$'"
+ $AE $W/a.rar renamed/first PROTECT r QUIET
+ check "$r protect" "rartest $W/a.rar && unrar l $W/a.rar | grep -q '^ -r--...... .*renamed/first'"
+ cp $S $W/a.rar
+ $AE $W/a.rar "$first" DELETE QUIET
+ check "$r delete" "rartest $W/a.rar && ! unrar lb $W/a.rar | grep -qx '$first'"
+ $AE $W/a.rar ADD $W/in/deep/er/source.c TO added QUIET
+ rm -rf $W/rx && mkdir -p $W/rx && (cd $W/rx && unrar x -idq ../a.rar)
+ check "$r add stored" "rartest $W/a.rar && cmp -s $W/in/deep/er/source.c $W/rx/added/source.c"
+done
+cp tests/samples/r_plain.rar $W/a.rar
+$AE $W/a.rar RENAME sub AS other QUIET
+check "rar rename drawer" "rartest $W/a.rar && unrar lb $W/a.rar | grep -q '^other/b.txt\$' && unrar lb $W/a.rar | grep -qx other"
+rm -rf $W/rx && mkdir -p $W/rx && (cd $W/rx && unrar x -idq ../a.rar)
+check "rar rename data" "grep -q 'second file' $W/rx/other/b.txt"
+cp tests/samples/r_solid.rar $W/a.rar
+$AE $W/a.rar RENAME a.txt AS b-first.txt QUIET
+check "rar solid rename" "rartest $W/a.rar && unrar lb $W/a.rar | grep -q '^b-first.txt\$'"
+$AE $W/a.rar sub DELETE QUIET >/dev/null
+check "rar solid delete refused" "[ \$? -eq 10 ]"
+check "rar solid info" "$AE $W/a.rar INFO | grep -q '^RAR: RENAME PROTECT\$'"
+if [ -f tests/samples/r_v4.rar ]; then
+ $AE tests/samples/r_v4.rar INFO >/dev/null
+ check "rar 4 refused" "[ \$? -eq 10 ]"
+fi
+$AE $W/new.rar ADD $W/in/text.txt QUIET >/dev/null
+check "rar new refused" "[ \$? -eq 10 ]"
+
 echo "passed $pass, failed $fail"
 [ $fail -eq 0 ]
