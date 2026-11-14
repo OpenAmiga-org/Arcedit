@@ -74,6 +74,15 @@ struct arc_format
 
  /* optional: the type of this archive when it differs from name (TGZ) */
  const char *(*type_name)(ARC *arc);
+
+ /* optional, for INFO: the ARC_CAN_* operations and the type from the
+    file's first bytes only, without opening the archive (must be fast).
+    NULL: ARC_CAN_ALL and name. */
+ uint32_t (*quick_caps)(const char *path, const uint8_t *head, uint32_t len, const char **type);
+
+ /* optional: extra free space (bytes) writing needs besides the new
+    archive itself (TGZ: the tar it packs) */
+ uint64_t (*extra_space)(ARC *arc);
 };
 
 extern const struct arc_format LhaFormat;

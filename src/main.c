@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include "arcformat.h"
 #include "platform.h"
@@ -72,6 +73,40 @@ static const struct arc_format *Formats[] =
 };
 
 static int Quiet = 0;
+
+/*
+** Errors: one line starting with "Error: ", the last line of the output,
+** with return code 10 or higher; the archive is unchanged then. Programs
+** that run arcedit can show that line.
+*/
+static void error(const char *fmt, ...)
+{
+ va_list ap;
+ va_start(ap, fmt);
+ printf("Error: ");
+ vprintf(fmt, ap);
+ printf("\n");
+ va_end(ap);
+}
+
+/* The last failed system call as an error */
+static void error_fault(const char *what)
+{
+ char buf[512];
+ plat_fault(what, buf, sizeof(buf));
+ error("%s", buf);
+}
+
+/* Warnings (return code 5): the operation was done for the rest */
+static void warning(const char *fmt, ...)
+{
+ va_list ap;
+ va_start(ap, fmt);
+ printf("Warning: ");
+ vprintf(fmt, ap);
+ printf("\n");
+ va_end(ap);
+}
 
 /****************************************************************************/
 /* argument parsing                                                         */
@@ -250,7 +285,7 @@ static int do_delete(const struct arc_format *f, ARC *arc, struct names *n, int 
   if(found) *changed = 1;
   else
   {
-   printf("%s: not in the archive\n", n->name[i]);
+   warning("%s is not in the archive", n->name[i]);
    missing++;
   }
  }
@@ -270,7 +305,7 @@ static int do_rename(const struct arc_format *f, ARC *arc, const char *from, con
 
  if(to[0] == 0)
  {
-  printf("AS needs a new name\n");
+  error("AS needs a new name");
   return RETURN_ERROR;
  }
  /* the new names must not be taken by entries that aren't renamed */
@@ -287,7 +322,7 @@ static int do_rename(const struct arc_format *f, ARC *arc, const char *from, con
    {
     if(o != e && match(f->path(o), from) == 0 && match(f->path(o), path) == 1)
     {
-     printf("%s: already in the archive\n", path);
+     error("%s is already in the archive", path);
      return RETURN_ERROR;
     }
    }
@@ -295,7 +330,7 @@ static int do_rename(const struct arc_format *f, ARC *arc, const char *from, con
  }
  if(!found)
  {
-  printf("%s: not in the archive\n", from);
+  error("%s is not in the archive", from);
   return RETURN_ERROR;
  }
  for(e = f->first(arc); e; e = f->next(arc, e))
@@ -380,7 +415,7 @@ static int do_attributes(const struct arc_format *f, ARC *arc, struct names *n, 
     uint8_t prot;
     if(parse_protection(protect, f->get_protection(e), &prot) != 0)
     {
-     printf("%s: bad protection, use the letters hsparwed\n", protect);
+     error("bad protection %s, use the letters hsparwed", protect);
      return -1;
     }
     f->set_protection(e, prot);
@@ -390,7 +425,7 @@ static int do_attributes(const struct arc_format *f, ARC *arc, struct names *n, 
   if(found) *changed = 1;
   else
   {
-   printf("%s: not in the archive\n", n->name[i]);
+   warning("%s is not in the archive", n->name[i]);
    missing++;
   }
  }
@@ -407,6 +442,7 @@ struct adder
  const char *prefix;       /* its path in the archive, "" or ending with '/' */
  int count;                /* entries added below it */
  int error;
+ uint64_t *added;          /* bytes added so far (all drawers) */
 };
 
 static int add_path(struct adder *a, const char *local, const char *archpath);
@@ -431,7 +467,7 @@ static int add_path(struct adder *a, const char *local, const char *archpath)
 
  if(plat_info(local, &info) != 0)
  {
-  plat_perror(local);
+  error_fault(local);
   return -1;
  }
  if(info.isdir)
@@ -447,7 +483,7 @@ static int add_path(struct adder *a, const char *local, const char *archpath)
   rc = plat_scan(local, add_scan_entry, &sub);
   if(rc != 0)
   {
-   if(rc < 0 && sub.error == 0) plat_perror(local);
+   if(rc < 0 && sub.error == 0) error_fault(local);
    return -1;
   }
   if(sub.count == 0 && prefix[0])
@@ -455,7 +491,7 @@ static int add_path(struct adder *a, const char *local, const char *archpath)
    int err = a->f->add(a->arc, prefix, NULL, 0, info.attr, info.comment, info.seconds);
    if(err)
    {
-    printf("%s: %s\n", prefix, a->f->error_text(err));
+    error("%s: %s", prefix, a->f->error_text(err));
     return -1;
    }
    if(!Quiet) printf("Added %s\n", prefix);
@@ -468,16 +504,23 @@ static int add_path(struct adder *a, const char *local, const char *archpath)
   uint32_t len;
   int err;
   if(strcmp(local, a->archive) == 0) return 0;   /* the archive itself */
-  if(plat_read(local, &buf, &len) != 0)
+  if(info.size > 0xFFFFFFFFu)
   {
-   plat_perror(local);
+   error("%s is too large (4 GB at most)", local);
    return -1;
   }
+  if(plat_read(local, &buf, &len) != 0)
+  {
+   if(buf == NULL && plat_size(local) == info.size) error("not enough memory for %s", local);
+   else error_fault(local);
+   return -1;
+  }
+  *a->added += len;
   err = a->f->add(a->arc, archpath, buf, len, info.attr, info.comment, info.seconds);
   free(buf);
   if(err)
   {
-   printf("%s: %s\n", local, a->f->error_text(err));
+   error("%s: %s", local, a->f->error_text(err));
    return -1;
   }
   if(!Quiet) printf("Added %s\n", archpath);
@@ -490,7 +533,7 @@ static int add_path(struct adder *a, const char *local, const char *archpath)
 ** Returns RETURN_OK or RETURN_ERROR.
 */
 static int do_add(const struct arc_format *f, ARC *arc, const char *archive, struct names *n,
-                  const char *to, int *changed)
+                  const char *to, int *changed, uint64_t *added)
 {
  struct adder a;
  char prefix[1024];
@@ -502,6 +545,7 @@ static int do_add(const struct arc_format *f, ARC *arc, const char *archive, str
  a.f = f;
  a.arc = arc;
  a.archive = archive;
+ a.added = added;
  for(i = 0; i < n->count; i++)
  {
   char archpath[1024];
@@ -525,17 +569,22 @@ static int do_add(const struct arc_format *f, ARC *arc, const char *archive, str
 ** The format of an existing archive (from its first bytes), or of a new
 ** one (from its name when create is set). NULL if none fits.
 */
+static uint8_t Head[64 * 1024];   /* the archive's first bytes */
+static uint32_t HeadLen;
+
 static const struct arc_format *find_format(const char *archive, int create, int *exists)
 {
- static uint8_t head[64 * 1024];
+ uint8_t *head = Head;
  FILE *fh = fopen(archive, "rb");
  int i;
 
  *exists = fh != NULL;
+ HeadLen = 0;
  if(fh)
  {
-  uint32_t len = (uint32_t)fread(head, 1, sizeof(head), fh);
+  uint32_t len = (uint32_t)fread(head, 1, sizeof(Head), fh);
   fclose(fh);
+  HeadLen = len;
   /* a format starting at the first byte wins over one found further in */
   {
    const struct arc_format *best = NULL;
@@ -571,6 +620,7 @@ int main(int argc, char **argv)
  const char *archive;
  char tmp[1024];
  int rc = RETURN_ERROR, changed = 0, exists, err, ops, i;
+ uint64_t added = 0;
 #ifdef __amigaos4__
  struct RDArgs *rda;
 #endif
@@ -586,7 +636,7 @@ int main(int argc, char **argv)
 #else
  if(host_readargs(argc, argv, args) != 0)
  {
-  printf("Usage: arcedit %s\n", TEMPLATE);
+  error("usage: arcedit %s", TEMPLATE);
   return RETURN_ERROR;
  }
 #endif
@@ -601,12 +651,12 @@ int main(int argc, char **argv)
        (args[ARG_COMMENT] != NULL || args[ARG_PROTECT] != NULL) + (args[ARG_INFO] != NULL);
  if(ops != 1)
  {
-  printf("Give one of DELETE, RENAME ... AS, ADD, COMMENT and/or PROTECT, INFO\n");
+  error("give one of DELETE, RENAME ... AS, ADD, COMMENT and/or PROTECT, INFO");
   goto done;
  }
  if(args[ARG_RENAME] && (args[ARG_AS] == NULL || args[ARG_ENTRIES] || args[ARG_LIST]))
  {
-  printf("Use RENAME <entry> AS <new name>\n");
+  error("use RENAME <entry> AS <new name>");
   goto done;
  }
 
@@ -625,7 +675,7 @@ int main(int argc, char **argv)
  }
  if(args[ARG_LIST] && names_from_file(&names, args[ARG_LIST]) != 0)
  {
-  plat_perror(args[ARG_LIST]);
+  error_fault(args[ARG_LIST]);
   goto done;
  }
  if(!args[ARG_ADD])
@@ -634,36 +684,55 @@ int main(int argc, char **argv)
  }
  if(names.count == 0 && !args[ARG_RENAME] && !args[ARG_INFO])
  {
-  printf("No entries given\n");
+  error("no entries given");
   goto done;
  }
 
  f = find_format(archive, args[ARG_ADD] != NULL, &exists);
  if(f == NULL)
  {
-  if(exists) printf("%s: not an archive type arcedit knows\n", archive);
-  else printf("%s: no such archive\n", archive);
+  if(exists) error("%s is not an archive type arcedit knows", archive);
+  else error("%s doesn't exist", archive);
   goto done;
  }
+
+ /* INFO: from the first bytes and the archive's write access only, without
+    reading the archive; problems of a particular operation are reported
+    when it runs */
+ if(args[ARG_INFO])
+ {
+  const char *type = f->name;
+  char why[512];
+  uint32_t caps = f->quick_caps ? f->quick_caps(archive, Head, HeadLen, &type) : ARC_CAN_ALL;
+  if(plat_writable(archive, why, sizeof(why)) != 0) caps = 0;
+  printf("%s:%s%s%s%s%s\n", type,
+         (caps & ARC_CAN_DELETE) ? " DELETE" : "", (caps & ARC_CAN_RENAME) ? " RENAME" : "",
+         (caps & ARC_CAN_COMMENT) ? " COMMENT" : "", (caps & ARC_CAN_PROTECT) ? " PROTECT" : "",
+         (caps & ARC_CAN_ADD) ? " ADD" : "");
+  rc = RETURN_OK;
+  goto done;
+ }
+
+ /* the archive must be replaceable */
+ {
+  char why[512];
+  if(plat_writable(archive, why, sizeof(why)) != 0)
+  {
+   error("%s", why);
+   goto done;
+  }
+ }
+
  arc = f->open(archive, args[ARG_ADD] != NULL, &err);
  if(arc == NULL)
  {
-  printf("%s: %s\n", archive, f->error_text(err));
+  error("%s: %s", archive, f->error_text(err));
   goto done;
  }
 
  /* what this archive allows */
  {
   uint32_t caps = f->caps(arc), need = 0;
-  if(args[ARG_INFO])
-  {
-   printf("%s:%s%s%s%s%s\n", f->type_name ? f->type_name(arc) : f->name,
-          (caps & ARC_CAN_DELETE) ? " DELETE" : "", (caps & ARC_CAN_RENAME) ? " RENAME" : "",
-          (caps & ARC_CAN_COMMENT) ? " COMMENT" : "", (caps & ARC_CAN_PROTECT) ? " PROTECT" : "",
-          (caps & ARC_CAN_ADD) ? " ADD" : "");
-   rc = RETURN_OK;
-   goto done;
-  }
   if(args[ARG_DELETE]) need |= ARC_CAN_DELETE;
   if(args[ARG_RENAME]) need |= ARC_CAN_RENAME;
   if(args[ARG_COMMENT]) need |= ARC_CAN_COMMENT;
@@ -671,7 +740,7 @@ int main(int argc, char **argv)
   if(args[ARG_ADD]) need |= ARC_CAN_ADD;
   if((caps & need) != need)
   {
-   printf("%s: %s archives can't do that (see INFO)\n", archive, f->type_name ? f->type_name(arc) : f->name);
+   error("%s archives can't do that", f->type_name ? f->type_name(arc) : f->name);
    goto done;
   }
  }
@@ -695,7 +764,7 @@ int main(int argc, char **argv)
   char to[1024];
   snprintf(to, sizeof(to), "%s", args[ARG_TO] ? (char *)args[ARG_TO] : "");
   normalize(to);
-  rc = do_add(f, arc, archive, &names, to, &changed);
+  rc = do_add(f, arc, archive, &names, to, &changed, &added);
  }
  else
  {
@@ -707,19 +776,30 @@ int main(int argc, char **argv)
  /* write a new archive next to the old one, then replace it */
  if(changed && rc != RETURN_ERROR)
  {
+  /* room for the new archive (at most the old one plus what was added)
+     next to the old one, before anything is written */
+  uint64_t freebytes, need = plat_size(archive) + added + 65536;
+  if(f->extra_space) need += f->extra_space(arc) + added;
+  if(plat_free_space(archive, &freebytes) == 0 && freebytes < need)
+  {
+   error("not enough free space: %lu KB needed, %lu KB free",
+         (unsigned long)(need / 1024), (unsigned long)(freebytes / 1024));
+   rc = RETURN_ERROR;
+   goto done;
+  }
   snprintf(tmp, sizeof(tmp), "%s.arcedit", archive);
   err = f->write(arc, tmp);
   f->close(arc);
   arc = NULL;
   if(err)
   {
-   printf("%s: %s; the archive was not changed\n", archive, f->error_text(err));
+   error("%s; the archive was not changed", f->error_text(err));
    plat_delete(tmp);
    rc = RETURN_ERROR;
   }
   else if(plat_replace(tmp, archive) != 0)
   {
-   plat_perror(archive);
+   error_fault(archive);
    plat_delete(tmp);
    rc = RETURN_ERROR;
   }

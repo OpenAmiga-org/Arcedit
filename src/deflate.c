@@ -467,7 +467,8 @@ struct inflater
  int bitcount;
  uint8_t *out;
  uint32_t outlen, outmax;
- int error;
+ uint32_t limit;          /* stop after this much output (0: no limit) */
+ int error;               /* < 0 bad data / memory, 1 limit reached */
 };
 
 static uint32_t bits(struct inflater *s, int n)
@@ -532,6 +533,11 @@ static int decode(struct inflater *s, const struct huff *h)
 
 static int outbyte(struct inflater *s, uint8_t c)
 {
+ if(s->limit && s->outlen >= s->limit)
+ {
+  s->error = 1;
+  return -1;
+ }
  if(s->outlen == s->outmax)
  {
   uint32_t max = s->outmax ? s->outmax * 2 : 65536;
@@ -580,7 +586,7 @@ static int codes(struct inflater *s, const struct huff *lh, const struct huff *d
  }
 }
 
-int inflate_raw(const uint8_t *in, uint32_t inlen, uint8_t **out, uint32_t *outlen, uint32_t *used)
+static int inflate_any(const uint8_t *in, uint32_t inlen, uint8_t **out, uint32_t *outlen, uint32_t *used, uint32_t limit)
 {
  struct inflater s;
  struct huff lh, dh;
@@ -589,6 +595,7 @@ int inflate_raw(const uint8_t *in, uint32_t inlen, uint8_t **out, uint32_t *outl
  memset(&s, 0, sizeof(s));
  s.in = in;
  s.inlen = inlen;
+ s.limit = limit;
  do
  {
   int type;
@@ -688,6 +695,7 @@ int inflate_raw(const uint8_t *in, uint32_t inlen, uint8_t **out, uint32_t *outl
  }
  while(!last && !s.error);
 
+ if(s.error == 1) s.error = 0;   /* stopped at the limit */
  if(s.error)
  {
   free(s.out);
@@ -697,4 +705,15 @@ int inflate_raw(const uint8_t *in, uint32_t inlen, uint8_t **out, uint32_t *outl
  *outlen = s.outlen;
  if(used) *used = s.pos;
  return *out ? 0 : -2;
+}
+
+int inflate_raw(const uint8_t *in, uint32_t inlen, uint8_t **out, uint32_t *outlen, uint32_t *used)
+{
+ return inflate_any(in, inlen, out, outlen, used, 0);
+}
+
+int inflate_head(const uint8_t *in, uint32_t inlen, uint8_t **out, uint32_t *outlen, uint32_t limit)
+{
+ uint32_t used;
+ return inflate_any(in, inlen, out, outlen, &used, limit);
 }

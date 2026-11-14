@@ -141,5 +141,7 @@ const struct arc_format LhaFormat =
  lhaf_set_protection,
  lhaf_remove,
  lhaf_add,
+ NULL,
+ NULL,
  NULL
 };

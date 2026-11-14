@@ -443,5 +443,7 @@ const struct arc_format LzxFormat =
  lzx_set_protection,
  lzx_remove,
  lzx_add,
+ NULL,
+ NULL,
  NULL
 };

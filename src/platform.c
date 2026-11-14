@@ -29,6 +29,7 @@ int plat_info(const char *path, struct plat_info *info)
  info->isdir = EXD_IS_DIRECTORY(dat) ? 1 : 0;
  info->attr = (uint8_t)(dat->Protection & 0xFF);
  IUtility->Strlcpy(info->comment, dat->Comment ? dat->Comment : "", sizeof(info->comment));
+ info->size = (uint64_t)dat->FileSize;
  info->seconds = (uint32_t)(dat->Date.ds_Days + AMIGA_EPOCH_DAYS) * 86400 +
                  (uint32_t)dat->Date.ds_Minute * 60 + (uint32_t)dat->Date.ds_Tick / TICKS_PER_SECOND;
  IDOS->FreeDosObject(DOS_EXAMINEDATA, dat);
@@ -90,9 +91,82 @@ void plat_delete(const char *path)
  IDOS->Delete(path);
 }
 
-void plat_perror(const char *what)
+void plat_fault(const char *what, char *buf, uint32_t size)
 {
- IDOS->PrintFault(IDOS->IoErr(), what);
+ IDOS->Fault(IDOS->IoErr(), what, buf, size);
+}
+
+/*
+** The drawer part of a path into buf ("RAM:x/y.lha" gives "RAM:x")
+*/
+static void parent_of(const char *path, char *buf, uint32_t size)
+{
+ IUtility->Strlcpy(buf, path, size);
+ *((char *)IDOS->PathPart(buf)) = 0;
+}
+
+int plat_writable(const char *path, char *buf, uint32_t size)
+{
+ struct ExamineData *dat = IDOS->ExamineObjectTags(EX_StringNameInput, path, TAG_END);
+ struct InfoData *id = IDOS->AllocDosObject(DOS_INFODATA, NULL);
+ char dir[1024];
+ int rc = 0;
+
+ if(dat)
+ {
+  /* the old archive is deleted when the new one replaces it */
+  if(dat->Protection & EXDF_NO_DELETE) rc = 1;
+  IDOS->FreeDosObject(DOS_EXAMINEDATA, dat);
+  if(rc)
+  {
+   snprintf(buf, size, "%s is protected from deletion", path);
+   IDOS->FreeDosObject(DOS_INFODATA, id);
+   return rc;
+  }
+ }
+ parent_of(path, dir, sizeof(dir));
+ if(id && IDOS->GetDiskInfoTags(GDI_StringNameInput, dir[0] ? dir : "", GDI_InfoData, id, TAG_END))
+ {
+  if(id->id_DiskState == ID_DISKSTATE_WRITE_PROTECTED)
+  {
+   snprintf(buf, size, "the volume of %s is write protected", path);
+   rc = 1;
+  }
+ }
+ if(id) IDOS->FreeDosObject(DOS_INFODATA, id);
+ return rc;
+}
+
+int plat_free_space(const char *path, uint64_t *bytes)
+{
+ struct InfoData *id = IDOS->AllocDosObject(DOS_INFODATA, NULL);
+ char dir[1024];
+ int rc = -1;
+ if(id == NULL) return -1;
+ parent_of(path, dir, sizeof(dir));
+ if(IDOS->GetDiskInfoTags(GDI_StringNameInput, dir[0] ? dir : "", GDI_InfoData, id, TAG_END))
+ {
+  /* RAM: and other growing volumes always report themselves full: unknown */
+  if(id->id_NumBlocksUsed < id->id_NumBlocks)
+  {
+   *bytes = (uint64_t)(id->id_NumBlocks - id->id_NumBlocksUsed) * (uint64_t)id->id_BytesPerBlock;
+   rc = 0;
+  }
+ }
+ IDOS->FreeDosObject(DOS_INFODATA, id);
+ return rc;
+}
+
+uint64_t plat_size(const char *path)
+{
+ struct ExamineData *dat = IDOS->ExamineObjectTags(EX_StringNameInput, path, TAG_END);
+ uint64_t size = 0;
+ if(dat)
+ {
+  size = (uint64_t)dat->FileSize;
+  IDOS->FreeDosObject(DOS_EXAMINEDATA, dat);
+ }
+ return size;
 }
 
 #else  /* host build (POSIX) */
@@ -100,6 +174,7 @@ void plat_perror(const char *what)
 #include <dirent.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -114,6 +189,7 @@ int plat_info(const char *path, struct plat_info *info)
  if(!(st.st_mode & S_IWUSR)) info->attr |= 0x04 | 0x01;
  if(!(st.st_mode & S_IXUSR) && !info->isdir) info->attr |= 0x02;
  info->comment[0] = 0;
+ info->size = (uint64_t)st.st_size;
  /* local time written as seconds, as LhA does */
  localtime_r(&st.st_mtime, &tm);
  info->seconds = (uint32_t)timegm(&tm);
@@ -163,9 +239,46 @@ void plat_delete(const char *path)
  remove(path);
 }
 
-void plat_perror(const char *what)
+void plat_fault(const char *what, char *buf, uint32_t size)
 {
- perror(what);
+ snprintf(buf, size, "%s: %s", what, strerror(errno));
+}
+
+static void parent_of(const char *path, char *buf, uint32_t size)
+{
+ char *p;
+ snprintf(buf, size, "%s", path);
+ p = strrchr(buf, '/');
+ if(p) *p = 0;
+ else snprintf(buf, size, ".");
+}
+
+int plat_writable(const char *path, char *buf, uint32_t size)
+{
+ char dir[1024];
+ parent_of(path, dir, sizeof(dir));
+ if(access(dir, W_OK) != 0)
+ {
+  snprintf(buf, size, "the drawer of %s can't be written", path);
+  return 1;
+ }
+ return 0;
+}
+
+int plat_free_space(const char *path, uint64_t *bytes)
+{
+ struct statvfs sv;
+ char dir[1024];
+ parent_of(path, dir, sizeof(dir));
+ if(statvfs(dir, &sv) != 0) return -1;
+ *bytes = (uint64_t)sv.f_bavail * (uint64_t)sv.f_frsize;
+ return 0;
+}
+
+uint64_t plat_size(const char *path)
+{
+ struct stat st;
+ return stat(path, &st) == 0 ? (uint64_t)st.st_size : 0;
 }
 
 #endif

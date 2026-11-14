@@ -47,9 +47,9 @@ taken as `----rwed`, and PROTECT marks them as Amiga entries.
 
 ## RAR
 
-Not handled. arcedit only supports formats xadmaster.library reads (Filer
-browses archives with it), and xadmaster has no client for RAR 5, the
-format current RAR versions write. (A header-editing RAR 5 backend existed
+Not handled. arcedit only supports formats that xadmaster.library (the
+AmigaOS archive reading library) reads, and xadmaster has no client for
+RAR 5, the format current RAR versions write. (A header-editing RAR 5 backend existed
 in commits d2e696f..d5b2c7e and was removed.)
 
 ## LZX

@@ -1,11 +1,9 @@
 # arcedit
 
-Edit archives without unpacking them. An AmigaOS 4 command that renames,
-deletes, adds and changes the comment and protection bits of archive
-entries.
-
-Every format is written in arcedit's own code, so the whole project can be
-released as public domain.
+Edit archives without unpacking them: rename, delete and add entries, and
+change their comments (file notes) and protection bits. A standalone
+command for **AmigaOS 4** and **Linux**, public domain, with no other
+libraries needed.
 
 | Format | DELETE | RENAME | COMMENT | PROTECT | ADD | New archive | Notes |
 |---|---|---|---|---|---|---|---|
@@ -16,12 +14,10 @@ released as public domain.
 | GZIP (`.gz`) | - | stored name | yes | - | replaces the file | yes | one file per `.gz` |
 | LZX (`.lzx`) | not part of a merged group | yes | yes | yes | stored | - | headers only |
 
-`arcedit <archive> INFO` prints what the archive allows, for example
-`ZIP: DELETE RENAME COMMENT PROTECT ADD`; an operation the archive doesn't
-allow is refused before anything is written. Only formats that
-xadmaster.library reads are handled (Filer browses archives with it), so
-there is no RAR support (xadmaster has no RAR 5 client); `.bz2` and `.xz`
-hold one stream without names or other fields, so there's nothing to edit. Details per format: `docs/formats.md`.
+The formats are the ones xadmaster.library (the AmigaOS archive reading
+library) reads; RAR 5 isn't among them. `.bz2` and `.xz` hold one stream
+without names or other fields, so there's nothing to edit. Every format is
+written in arcedit's own code. Details per format: `docs/formats.md`.
 
 ## How it works
 
@@ -72,10 +68,29 @@ Return codes: 0 done, 5 some entries weren't in the archive (the others
 were done), 10 nothing was changed (bad arguments, archive error), 20 out
 of memory.
 
+## Using arcedit from other programs
+
+- `arcedit <archive> INFO` prints one line: the archive type and the
+  operations this archive allows, e.g. `ZIP: DELETE RENAME COMMENT PROTECT
+  ADD`. It reads only the archive's first bytes and checks that the archive
+  can be replaced (not delete protected, volume not write protected), so
+  it is fast for any archive size. An archive that can't be changed gives
+  just the type (`LHA:`).
+- An operation INFO listed can still fail for reasons only that operation
+  shows: a damaged or unsupported archive (ZIP64), not enough free space
+  or memory, an added file over 4 GB, one file out of an LZX merged group.
+  arcedit checks these before writing anything. Then the last line of the
+  output is `Error: <message>` and the return code is 10 (20 for out of
+  memory); the archive is unchanged.
+- Return code 5 with `Warning:` lines: some entries weren't in the
+  archive, the others were done.
+- Entry lists for DELETE, COMMENT and PROTECT can be passed in a file
+  (`FROM`), one entry per line.
+
 ## Building
 
 ```
-make            # host build (bin/arcedit), used by the tests
+make            # Linux (or other POSIX) build: bin/arcedit
 make test       # host tests: results checked with Lhasa, unzip, GNU tar,
                 # bsdtar, gzip, unar (lsar) and the small readers in
                 # tests/*info.py; LHa for UNIX when it's there (LHAUNIX=)

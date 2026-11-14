@@ -31,6 +31,7 @@
 #define GZ_ERR_FORMAT 2
 #define GZ_ERR_MEM    3
 #define GZ_ERR_ONE    4
+#define GZ_ERR_SPACE  5
 #define GZ_ERR_TAR    100   /* + a TAR backend error */
 
 #define FTEXT    0x01
@@ -86,6 +87,7 @@ static const char *gz_error_text(int err)
   case GZ_ERR_FORMAT: return "not a gzip file or damaged";
   case GZ_ERR_MEM:    return "out of memory";
   case GZ_ERR_ONE:    return "a gzip file holds one file (use .tgz for more)";
+  case GZ_ERR_SPACE:  return "not enough free space to unpack the tar";
  }
  return "unknown error";
 }
@@ -308,6 +310,14 @@ static ARC *gz_open(const char *path, int create, int *err)
   {
    FILE *t;
    int e;
+   uint64_t freebytes;
+   /* room for the unpacked tar next to the archive */
+   if(plat_free_space(path, &freebytes) == 0 && freebytes < (uint64_t)plainlen + 65536)
+   {
+    free(plain);
+    *err = GZ_ERR_SPACE;
+    goto fail;
+   }
    snprintf(g->tarname, sizeof(g->tarname), "%s.arcedit-tar", path);
    t = fopen(g->tarname, "wb");
    if(t == NULL || fwrite(plain, 1, plainlen, t) != plainlen)
@@ -581,6 +591,39 @@ static void gz_close_current(ARC *arc)
  gz_close(arc);
 }
 
+/*
+** INFO: is it a tar inside? Unpack only the start of the stream.
+*/
+static uint32_t gz_quick_caps(const char *path, const uint8_t *head, uint32_t len, const char **type)
+{
+ uint32_t p = 10;
+ uint8_t *plain = NULL;
+ uint32_t plainlen = 0;
+ int istar = 0;
+ (void)path;
+ if(len < 18) return 0;
+ if(head[3] & FEXTRA) p += 2u + (head[10] | (head[11] << 8));
+ if(head[3] & FNAME) while(p < len && head[p++]);
+ if(head[3] & FCOMMENT) while(p < len && head[p++]);
+ if(head[3] & FHCRC) p += 2;
+ if(p < len && inflate_head(head + p, len - p, &plain, &plainlen, 512) == 0)
+ {
+  istar = plainlen >= 512 && TarFormat.probe(plain, plainlen) == 2;
+  free(plain);
+ }
+ *type = istar ? "TGZ" : "GZIP";
+ return istar ? ARC_CAN_ALL : (ARC_CAN_RENAME | ARC_CAN_COMMENT | ARC_CAN_ADD);
+}
+
+/*
+** Writing a TGZ also needs room for the edited tar
+*/
+static uint64_t gz_extra_space(ARC *arc)
+{
+ struct gz_archive *g = arc;
+ return g->tar ? plat_size(g->tarname) : 0;
+}
+
 const struct arc_format GzFormat =
 {
  "GZIP",
@@ -600,5 +643,7 @@ const struct arc_format GzFormat =
  gz_set_protection,
  gz_remove,
  gz_add,
- gz_type_name
+ gz_type_name,
+ gz_quick_caps,
+ gz_extra_space
 };

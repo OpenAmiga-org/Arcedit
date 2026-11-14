@@ -320,5 +320,23 @@ $AE $W/c.lzx ADD $W/in/deep/er/source.c QUIET
 rm -rf $W/lx && mkdir -p $W/lx && (cd $W/lx && unar -q -D ../c.lzx)
 check "real lzx stored delete+add" "lzxtest $W/c.lzx && cmp -s $W/in/deep/er/source.c $W/lx/source.c && ! $XI $W/c.lzx | grep -q '^sub/b.txt'"
 
+# ---------------------------------------------------------------- INFO and errors
+# INFO answers from the first bytes: fast even for a big .tgz
+mkdir -p $W/big && head -c 30000000 /dev/urandom > $W/big/r.bin && tar -czf $W/big.tgz -C $W big
+start=$(date +%s%N); $AE $W/big.tgz INFO > $W/info.txt; end=$(date +%s%N)
+check "info tgz fast" "grep -q '^TGZ: DELETE' $W/info.txt && [ \$(( (end - start) / 1000000 )) -lt 200 ]"
+# an archive that can't be replaced: INFO lists nothing, operations fail
+mkdir -p $W/ro && cp tests/samples/h1.lha $W/ro/ && chmod 555 $W/ro
+check "info read-only" "[ \"\$($AE $W/ro/h1.lha INFO)\" = 'LHA:' ]"
+$AE $W/ro/h1.lha a.txt DELETE > $W/err.txt
+check "read-only refused" "[ \$? -eq 10 ] && tail -1 $W/err.txt | grep -q '^Error: '"
+chmod 755 $W/ro
+# errors are the last line, starting with "Error: "
+cp tests/samples/x_mix.lzx $W/a.lzx
+$AE $W/a.lzx m/one.txt DELETE > $W/err.txt
+check "error last line" "[ \$? -eq 10 ] && tail -1 $W/err.txt | grep -q '^Error: .*merged.*not changed'"
+$AE $W/a.lzx nosuch DELETE > $W/err.txt
+check "warning rc 5" "[ \$? -eq 5 ] && grep -q '^Warning: nosuch' $W/err.txt"
+
 echo "passed $pass, failed $fail"
 [ $fail -eq 0 ]

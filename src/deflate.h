@@ -27,4 +27,9 @@ uint32_t deflate_bound(uint32_t len);
    Returns 0 on success, -1 for bad data, -2 when out of memory. */
 int inflate_raw(const uint8_t *in, uint32_t inlen, uint8_t **out, uint32_t *outlen, uint32_t *used);
 
+/* As inflate_raw, but stops after limit output bytes (a quick look at the
+   start of a stream). Returns 0 when limit bytes (or the whole stream)
+   came out. */
+int inflate_head(const uint8_t *in, uint32_t inlen, uint8_t **out, uint32_t *outlen, uint32_t limit);
+
 #endif
