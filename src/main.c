@@ -52,18 +52,19 @@ static const char __attribute__((used)) verstag[] = "\0$VER: " VERSION_STRING;
 /* the shell gives commands this much stack at least */
 static const char __attribute__((used)) stackcookie[] = "$STACK: 65536";
 
-#define TEMPLATE "ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/K,FROM=LIST/K,QUIET/S"
+#define TEMPLATE "ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/K,FROM=LIST/K,INFO/S,QUIET/S"
 
 enum
 {
  ARG_ARCHIVE, ARG_ENTRIES, ARG_DELETE, ARG_RENAME, ARG_AS, ARG_COMMENT, ARG_PROTECT,
- ARG_ADD, ARG_TO, ARG_LIST, ARG_QUIET, ARG_COUNT
+ ARG_ADD, ARG_TO, ARG_LIST, ARG_INFO, ARG_QUIET, ARG_COUNT
 };
 
 /* Archive formats, tried in this order */
 static const struct arc_format *Formats[] =
 {
  &LhaFormat,
+ &ZipFormat,
  NULL
 };
 
@@ -82,7 +83,7 @@ static int Quiet = 0;
 static int host_readargs(int argc, char **argv, void **args)
 {
  static const char *keys[ARG_COUNT] = { "ARCHIVE", "ENTRIES", "DELETE", "RENAME", "AS", "COMMENT",
-                                        "PROTECT", "ADD", "TO", "FROM", "QUIET" };
+                                        "PROTECT", "ADD", "TO", "FROM", "INFO", "QUIET" };
  static char *multi[256];
  int i, nmulti = 0;
 
@@ -96,7 +97,7 @@ static int host_readargs(int argc, char **argv, void **args)
    if(strlen(keys[k]) == klen && strncasecmp(a, keys[k], klen) == 0) found = k;
   }
   if(klen == 4 && strncasecmp(a, "LIST", 4) == 0) found = ARG_LIST;
-  if(found == ARG_DELETE || found == ARG_ADD || found == ARG_QUIET)
+  if(found == ARG_DELETE || found == ARG_ADD || found == ARG_QUIET || found == ARG_INFO)
   {
    args[found] = (void *)1;
   }
@@ -532,11 +533,21 @@ static const struct arc_format *find_format(const char *archive, int create, int
  {
   uint32_t len = (uint32_t)fread(head, 1, sizeof(head), fh);
   fclose(fh);
-  for(i = 0; Formats[i]; i++)
+  /* a format starting at the first byte wins over one found further in */
   {
-   if(Formats[i]->probe(head, len)) return Formats[i];
+   const struct arc_format *best = NULL;
+   int score = 0;
+   for(i = 0; Formats[i]; i++)
+   {
+    int sc = Formats[i]->probe(head, len);
+    if(sc > score)
+    {
+     score = sc;
+     best = Formats[i];
+    }
+   }
+   return best;
   }
-  return NULL;
  }
  if(create)
  {
@@ -584,10 +595,10 @@ int main(int argc, char **argv)
 
  /* exactly one kind of operation; COMMENT and PROTECT may go together */
  ops = (args[ARG_DELETE] != NULL) + (args[ARG_RENAME] != NULL) + (args[ARG_ADD] != NULL) +
-       (args[ARG_COMMENT] != NULL || args[ARG_PROTECT] != NULL);
+       (args[ARG_COMMENT] != NULL || args[ARG_PROTECT] != NULL) + (args[ARG_INFO] != NULL);
  if(ops != 1)
  {
-  printf("Give one of DELETE, RENAME ... AS, ADD, COMMENT and/or PROTECT\n");
+  printf("Give one of DELETE, RENAME ... AS, ADD, COMMENT and/or PROTECT, INFO\n");
   goto done;
  }
  if(args[ARG_RENAME] && (args[ARG_AS] == NULL || args[ARG_ENTRIES] || args[ARG_LIST]))
@@ -618,7 +629,7 @@ int main(int argc, char **argv)
  {
   for(i = 0; i < names.count; i++) normalize(names.name[i]);
  }
- if(names.count == 0 && !args[ARG_RENAME])
+ if(names.count == 0 && !args[ARG_RENAME] && !args[ARG_INFO])
  {
   printf("No entries given\n");
   goto done;
@@ -636,6 +647,30 @@ int main(int argc, char **argv)
  {
   printf("%s: %s\n", archive, f->error_text(err));
   goto done;
+ }
+
+ /* what this archive allows */
+ {
+  uint32_t caps = f->caps(arc), need = 0;
+  if(args[ARG_INFO])
+  {
+   printf("%s:%s%s%s%s%s\n", f->name,
+          (caps & ARC_CAN_DELETE) ? " DELETE" : "", (caps & ARC_CAN_RENAME) ? " RENAME" : "",
+          (caps & ARC_CAN_COMMENT) ? " COMMENT" : "", (caps & ARC_CAN_PROTECT) ? " PROTECT" : "",
+          (caps & ARC_CAN_ADD) ? " ADD" : "");
+   rc = RETURN_OK;
+   goto done;
+  }
+  if(args[ARG_DELETE]) need |= ARC_CAN_DELETE;
+  if(args[ARG_RENAME]) need |= ARC_CAN_RENAME;
+  if(args[ARG_COMMENT]) need |= ARC_CAN_COMMENT;
+  if(args[ARG_PROTECT]) need |= ARC_CAN_PROTECT;
+  if(args[ARG_ADD]) need |= ARC_CAN_ADD;
+  if((caps & need) != need)
+  {
+   printf("%s: %s archives can't do that here (see INFO)\n", archive, f->name);
+   goto done;
+  }
  }
 
  rc = RETURN_OK;

@@ -155,5 +155,48 @@ else
  echo "(LHa for UNIX not found at $LHAUNIX, its tests skipped)"
 fi
 
+# ---------------------------------------------------------------- ZIP
+ZI="python3 $PWD/tests/zipinfo.py"
+ziptest() { unzip -tq "$1" >/dev/null 2>&1 && $ZI "$1" >/dev/null 2>&1; }
+for z in z_unix z_stream z_amiga; do
+ S=tests/samples/$z.zip
+ cp $S $W/a.zip
+ $AE $W/a.zip a.txt COMMENT "zip note" QUIET
+ check "$z comment" "$ZI $W/a.zip | grep -q '^a.txt|.*|zip note\$'"
+ check "$z comment unzip -t" "ziptest $W/a.zip"
+ $AE $W/a.zip sub/b.txt PROTECT +s-w QUIET
+ check "$z protect" "$ZI $W/a.zip | grep -q '^sub/b.txt|1|-s--r-[e-][d-]|'"
+ cp $S $W/a.zip
+ $AE $W/a.zip RENAME a.txt AS docs/first.txt QUIET
+ $AE $W/a.zip RENAME sub AS other QUIET
+ check "$z rename" "$ZI $W/a.zip | grep -q '^docs/first.txt|' && $ZI $W/a.zip | grep -q '^other/b.txt|' && ! $ZI $W/a.zip | grep -q '^sub/'"
+ check "$z rename unzip -t" "ziptest $W/a.zip"
+ rm -rf $W/zx && mkdir -p $W/zx && (cd $W/zx && unzip -q ../a.zip)
+ check "$z rename data" "grep -q 'hello world' $W/zx/docs/first.txt && grep -q 'second file' $W/zx/other/b.txt"
+ cp $S $W/a.zip
+ $AE $W/a.zip sub DELETE QUIET
+ check "$z delete drawer" "! $ZI $W/a.zip | grep -q '^sub' && $ZI $W/a.zip | grep -q '^a.txt|'"
+ check "$z delete unzip -t" "ziptest $W/a.zip"
+ $AE $W/a.zip ADD $W/in/deep/er/source.c $W/in/text.txt TO added QUIET
+ check "$z add" "ziptest $W/a.zip && $ZI $W/a.zip | grep -q '^added/source.c|1|.*|8|'"
+ rm -rf $W/zx && mkdir -p $W/zx && (cd $W/zx && unzip -q ../a.zip)
+ check "$z add data" "cmp -s $W/in/deep/er/source.c $W/zx/added/source.c && cmp -s $W/in/text.txt $W/zx/added/text.txt"
+ printf 'replaced\n' > $W/a.txt
+ $AE $W/a.zip ADD $W/a.txt QUIET
+ rm -rf $W/zx && mkdir -p $W/zx && (cd $W/zx && unzip -q ../a.zip)
+ check "$z add replaces" "[ \$($ZI $W/a.zip | grep -c '^a.txt|') -eq 1 ] && cmp -s $W/a.txt $W/zx/a.txt"
+done
+check "zip archive comment kept" "cp tests/samples/z_amiga.zip $W/c.zip && $AE $W/c.zip a.txt DELETE QUIET && $ZI $W/c.zip | grep -q '^#amiga archive'"
+# a new ZIP with drawers, empty drawer, random data (stored)
+$AE $W/new.zip ADD $W/in QUIET
+check "zip new archive" "ziptest $W/new.zip"
+rm -rf $W/zx && mkdir -p $W/zx && (cd $W/zx && unzip -q ../new.zip)
+for f in random.bin text.txt zeros.bin deep/binary emptyfile deep/er/one deep/er/source.c; do
+ check "zip new data $f" "cmp -s $W/in/$f $W/zx/in/$f"
+done
+check "zip new empty drawer" "[ -d $W/zx/in/empty ]"
+check "zip new random stored" "$ZI $W/new.zip | grep -q '^in/random.bin|1|.*|0|'"
+check "zip info" "$AE $W/new.zip INFO | grep -q '^ZIP: DELETE RENAME COMMENT PROTECT ADD'"
+
 echo "passed $pass, failed $fail"
 [ $fail -eq 0 ]

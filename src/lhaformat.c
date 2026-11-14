@@ -19,7 +19,7 @@ static int lhaf_probe(const uint8_t *head, uint32_t len)
  for(off = 0; off + 22 <= len; off++)
  {
   const uint8_t *p = head + off;
-  if(p[2] == '-' && p[3] == 'l' && (p[4] == 'h' || p[4] == 'z') && p[6] == '-' && p[20] <= 2) return 1;
+  if(p[2] == '-' && p[3] == 'l' && (p[4] == 'h' || p[4] == 'z') && p[6] == '-' && p[20] <= 2) return off == 0 ? 2 : 1;
  }
  return 0;
 }
@@ -43,6 +43,12 @@ static void lhaf_close(ARC *arc)
 static int lhaf_write(ARC *arc, const char *path)
 {
  return lha_write(arc, path);
+}
+
+static uint32_t lhaf_caps(ARC *arc)
+{
+ (void)arc;
+ return ARC_CAN_ALL;
 }
 
 static ENTRY *lhaf_first(ARC *arc)
@@ -125,6 +131,7 @@ const struct arc_format LhaFormat =
  lhaf_close,
  lhaf_write,
  lha_error_text,
+ lhaf_caps,
  lhaf_first,
  lhaf_next,
  lhaf_path,

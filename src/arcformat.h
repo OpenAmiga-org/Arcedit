@@ -25,6 +25,14 @@
 #define ARC_PROT_S 0x40
 #define ARC_PROT_H 0x80
 
+/* Operations a format supports (caps()), may depend on the archive */
+#define ARC_CAN_DELETE  0x01
+#define ARC_CAN_RENAME  0x02
+#define ARC_CAN_COMMENT 0x04
+#define ARC_CAN_PROTECT 0x08
+#define ARC_CAN_ADD     0x10
+#define ARC_CAN_ALL     0x1F
+
 typedef void ARC;     /* an open archive */
 typedef void ENTRY;   /* one entry of it */
 
@@ -32,7 +40,8 @@ struct arc_format
 {
  const char *name;
 
- /* TRUE if the file's first bytes (len of them) are this format */
+ /* 2 if the file's first bytes (len of them) start like this format, 1 if
+    the format is found further in (self-extracting archives), else 0 */
  int (*probe)(const uint8_t *head, uint32_t len);
  /* TRUE if a new archive with this name should be this format (extension) */
  int (*probe_name)(const char *path);
@@ -44,6 +53,8 @@ struct arc_format
  /* write the edited archive to another file; 0 on success, else an error code */
  int (*write)(ARC *arc, const char *path);
  const char *(*error_text)(int err);
+ /* ARC_CAN_* operations possible on this archive; calls for the others may be NULL */
+ uint32_t (*caps)(ARC *arc);
 
  /* entries in archive order */
  ENTRY *(*first)(ARC *arc);
@@ -63,5 +74,6 @@ struct arc_format
 };
 
 extern const struct arc_format LhaFormat;
+extern const struct arc_format ZipFormat;
 
 #endif
