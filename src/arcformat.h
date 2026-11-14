@@ -71,10 +71,14 @@ struct arc_format
  /* add or replace an entry from memory; 0 on success, else an error code */
  int (*add)(ARC *arc, const char *path, const uint8_t *buf, uint32_t len,
             uint8_t prot, const char *comment, uint32_t seconds);
+
+ /* optional: the type of this archive when it differs from name (TGZ) */
+ const char *(*type_name)(ARC *arc);
 };
 
 extern const struct arc_format LhaFormat;
 extern const struct arc_format ZipFormat;
 extern const struct arc_format TarFormat;
+extern const struct arc_format GzFormat;
 
 #endif

@@ -688,5 +688,6 @@ const struct arc_format ZipFormat =
  zip_get_protection,
  zip_set_protection,
  zip_remove,
- zip_add
+ zip_add,
+ NULL
 };

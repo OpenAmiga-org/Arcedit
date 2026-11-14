@@ -698,5 +698,6 @@ const struct arc_format TarFormat =
  tar_get_protection,
  tar_set_protection,
  tar_remove,
- tar_add
+ tar_add,
+ NULL
 };

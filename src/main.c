@@ -66,6 +66,7 @@ static const struct arc_format *Formats[] =
  &LhaFormat,
  &ZipFormat,
  &TarFormat,
+ &GzFormat,
  NULL
 };
 
@@ -655,7 +656,7 @@ int main(int argc, char **argv)
   uint32_t caps = f->caps(arc), need = 0;
   if(args[ARG_INFO])
   {
-   printf("%s:%s%s%s%s%s\n", f->name,
+   printf("%s:%s%s%s%s%s\n", f->type_name ? f->type_name(arc) : f->name,
           (caps & ARC_CAN_DELETE) ? " DELETE" : "", (caps & ARC_CAN_RENAME) ? " RENAME" : "",
           (caps & ARC_CAN_COMMENT) ? " COMMENT" : "", (caps & ARC_CAN_PROTECT) ? " PROTECT" : "",
           (caps & ARC_CAN_ADD) ? " ADD" : "");
@@ -669,7 +670,7 @@ int main(int argc, char **argv)
   if(args[ARG_ADD]) need |= ARC_CAN_ADD;
   if((caps & need) != need)
   {
-   printf("%s: %s archives can't do that here (see INFO)\n", archive, f->name);
+   printf("%s: %s archives can't do that (see INFO)\n", archive, f->type_name ? f->type_name(arc) : f->name);
    goto done;
   }
  }

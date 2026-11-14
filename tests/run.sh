@@ -243,5 +243,38 @@ done
 check "tar new empty drawer" "[ -d $W/tx/in/empty ]"
 check "tar info" "$AE $W/new.tar INFO | grep -q '^TAR: DELETE RENAME COMMENT PROTECT ADD'"
 
+# ---------------------------------------------------------------- GZIP / TGZ
+GI="python3 $PWD/tests/gzinfo.py"
+cp tests/samples/g_note.gz $W/a.gz
+$AE $W/a.gz a.txt COMMENT "new gz note" QUIET
+check "gz comment" "$GI $W/a.gz | grep -q '^a.txt|new gz note\$' && gzip -t $W/a.gz"
+$AE $W/a.gz RENAME a.txt AS renamed.txt QUIET
+check "gz rename" "$GI $W/a.gz | grep -q '^renamed.txt|new gz note\$' && gzip -t $W/a.gz"
+check "gz data kept" "gzip -dc $W/a.gz | grep -c 'hello world' | grep -q 10"
+$AE $W/a.gz ADD $W/in/deep/er/source.c QUIET
+check "gz add replaces" "gzip -dc $W/a.gz | cmp -s - $W/in/deep/er/source.c && $GI $W/a.gz | grep -q '^source.c|'"
+$AE $W/a.gz a.txt DELETE QUIET >/dev/null
+check "gz delete refused" "[ \$? -eq 10 ]"
+$AE $W/a.gz ADD $W/in/text.txt $W/in/zeros.bin QUIET >/dev/null
+check "gz two files refused" "[ \$? -eq 10 ]"
+$AE $W/new.gz ADD $W/in/text.txt QUIET
+check "gz new" "gzip -dc $W/new.gz | cmp -s - $W/in/text.txt"
+check "gz info" "$AE $W/a.gz INFO | grep -q '^GZIP: RENAME COMMENT ADD\$'"
+
+cp tests/samples/g_tar.tgz $W/a.tgz
+$AE $W/a.tgz a.txt COMMENT "tgz note" QUIET
+check "tgz comment" "gzip -t $W/a.tgz && gzip -dc $W/a.tgz > $W/a_.tar && $TI $W/a_.tar | grep -q '^a.txt|.*|tgz note\$'"
+$AE $W/a.tgz RENAME sub AS other QUIET
+$AE $W/a.tgz a.txt DELETE QUIET
+$AE $W/a.tgz ADD $W/in/deep/er/source.c TO other QUIET
+check "tgz tar -tz" "tar -tzf $W/a.tgz >/dev/null 2>&1"
+rm -rf $W/tx && mkdir -p $W/tx && tar -xzf $W/a.tgz -C $W/tx
+check "tgz edits" "[ ! -e $W/tx/a.txt ] && grep -q 'second file' $W/tx/other/b.txt && cmp -s $W/in/deep/er/source.c $W/tx/other/source.c"
+check "tgz no temp files left" "! ls $W/a.tgz.arcedit* >/dev/null 2>&1"
+$AE $W/new.tar.gz ADD $W/in QUIET
+rm -rf $W/tx && mkdir -p $W/tx && tar -xzf $W/new.tar.gz -C $W/tx
+check "tgz new" "cmp -s $W/in/deep/binary $W/tx/in/deep/binary && cmp -s $W/in/text.txt $W/tx/in/text.txt"
+check "tgz info" "$AE $W/a.tgz INFO | grep -q '^TGZ: DELETE RENAME COMMENT PROTECT ADD'"
+
 echo "passed $pass, failed $fail"
 [ $fail -eq 0 ]
