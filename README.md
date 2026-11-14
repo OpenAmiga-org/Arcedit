@@ -87,6 +87,13 @@ of memory.
 - Entry lists for DELETE, COMMENT and PROTECT can be passed in a file
   (`FROM`), one entry per line.
 
+## Names
+
+Entry names inside archives are Latin-1, as on the Amiga. The Linux build
+converts UTF-8 names (from the command line, list files and the file
+system) to Latin-1 for new names, and a UTF-8 name that matches no entry
+is tried again as Latin-1.
+
 ## Building
 
 ```
@@ -95,6 +102,10 @@ make test       # host tests: results checked with Lhasa, unzip, GNU tar,
                 # bsdtar, gzip, unar (lsar) and the small readers in
                 # tests/*info.py; LHa for UNIX when it's there (LHAUNIX=)
 make os4        # AmigaOS 4 build (bin/os4/arcedit) in the walkero/amigagccondocker image
+make fuzz       # damaged archives against an AddressSanitizer/UBSan build
+python3 tests/corpus.py DIR   # every edit on real archives in DIR, checked with
+                # Lhasa, unzip, GNU tar, gzip and unar (the corpus isn't in
+                # the repository: download archives from Aminet / OS4Depot)
 ```
 
 ## Files

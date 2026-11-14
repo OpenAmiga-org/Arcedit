@@ -351,5 +351,15 @@ cp tests/samples/h1.lha $long
 check "long archive name" "$AE $long a.txt COMMENT x QUIET && lha t $long >/dev/null 2>&1"
 rm -f $long
 
+# names: archives hold Latin-1; UTF-8 names (Linux) are converted
+U8=$(printf 'S\303\274d.txt'); L1=$(printf 'S\374d.txt')
+cp tests/samples/h1.lha $W/u.lha
+$AE $W/u.lha RENAME a.txt AS "$U8" QUIET
+check "utf-8 rename stored latin-1" "$INFO $W/u.lha | iconv -f utf-8 -t latin1 | grep -q '^$L1|'"
+$AE $W/u.lha "$U8" COMMENT x QUIET
+check "utf-8 name matches latin-1" "[ \$? -eq 0 ]"
+$AE $W/u.lha "$L1" DELETE QUIET
+check "latin-1 name matches" "[ \$? -eq 0 ] && lha t $W/u.lha >/dev/null 2>&1 && ! $INFO $W/u.lha | iconv -f utf-8 -t latin1 | grep -q '^$L1|'"
+
 echo "passed $pass, failed $fail"
 [ $fail -eq 0 ]

@@ -240,6 +240,46 @@ static int lower(int c)
 }
 
 /*
+** A name given in UTF-8 (a Linux terminal, a UTF-8 list file) as Latin-1,
+** the character set of Amiga archives. Returns 0 when it isn't UTF-8 with
+** characters above 127 (then there's nothing else to try).
+*/
+static int utf8_to_latin1(const char *in, char *out, size_t size)
+{
+ size_t o = 0;
+ int changed = 0;
+ const unsigned char *p = (const unsigned char *)in;
+ while(*p && o + 1 < size)
+ {
+  if(*p < 0x80) out[o++] = (char)*p++;
+  else if((p[0] & 0xE0) == 0xC0 && (p[1] & 0xC0) == 0x80 && p[0] <= 0xC3)
+  {
+   out[o++] = (char)(((p[0] & 0x1F) << 6) | (p[1] & 0x3F));
+   p += 2;
+   changed = 1;
+  }
+  else return 0;   /* not UTF-8 (or not Latin-1 characters) */
+ }
+ out[o] = 0;
+ return changed && *p == 0;
+}
+
+/*
+** New names in archives are Latin-1, as on the Amiga. Linux builds get
+** UTF-8 names (command line, file system) and convert them when they can.
+*/
+static void archive_name(char *name, size_t size)
+{
+#ifndef __amigaos4__
+ char l1[1024];
+ if(size <= sizeof(l1) && utf8_to_latin1(name, l1, sizeof(l1))) snprintf(name, size, "%s", l1);
+#else
+ (void)name;
+ (void)size;
+#endif
+}
+
+/*
 ** How an entry path relates to a name given by the user:
 ** 1 the entry itself (a drawer entry "x/" is matched by "x"),
 ** 2 inside the drawer name ("x/..."), 0 no match
@@ -282,6 +322,16 @@ static int do_delete(const struct arc_format *f, ARC *arc, struct names *n, int 
     found = 1;
    }
    e = next;
+  }
+  if(!found)
+  {
+   char l1[1024];
+   if(utf8_to_latin1(n->name[i], l1, sizeof(l1)))
+   {
+    strcpy(n->name[i], l1);   /* never longer than the UTF-8 */
+    i--;
+    continue;
+   }
   }
   if(found) *changed = 1;
   else
@@ -331,6 +381,12 @@ static int do_rename(const struct arc_format *f, ARC *arc, const char *from, con
  }
  if(!found)
  {
+  char l1[1024], l2[1024];
+  if(utf8_to_latin1(from, l1, sizeof(l1)))
+  {
+   if(!utf8_to_latin1(to, l2, sizeof(l2))) snprintf(l2, sizeof(l2), "%s", to);
+   return do_rename(f, arc, l1, l2, changed);
+  }
   error("%s is not in the archive", from);
   return RETURN_ERROR;
  }
@@ -423,6 +479,16 @@ static int do_attributes(const struct arc_format *f, ARC *arc, struct names *n, 
     if(!Quiet) printf("Protection of %s set\n", f->path(e));
    }
   }
+  if(!found)
+  {
+   char l1[1024];
+   if(utf8_to_latin1(n->name[i], l1, sizeof(l1)))
+   {
+    strcpy(n->name[i], l1);
+    i--;
+    continue;
+   }
+  }
   if(found) *changed = 1;
   else
   {
@@ -460,6 +526,7 @@ static int add_scan_entry(const char *name, void *userdata)
  char local[1024], archpath[1024];
  plat_join(local, sizeof(local), a->local, name);
  snprintf(archpath, sizeof(archpath), "%s%s", a->prefix, name);
+ archive_name(archpath, sizeof(archpath));
  a->count++;
  return add_path(a, local, archpath);
 }
@@ -563,6 +630,7 @@ static int do_add(const struct arc_format *f, ARC *arc, const char *archive, str
    size_t l = strlen(archpath);
    if(l > 0 && archpath[l - 1] == '/') archpath[l - 1] = 0;
   }
+  archive_name(archpath, sizeof(archpath));
   if(add_path(&a, n->name[i], archpath) != 0) return RETURN_ERROR;
   *changed = 1;
  }
@@ -765,6 +833,7 @@ int main(int argc, char **argv)
   snprintf(to, sizeof(to), "%s", (char *)args[ARG_AS]);
   normalize(from);
   normalize(to);
+  archive_name(to, sizeof(to));
   rc = do_rename(f, arc, from, to, &changed);
  }
  else if(args[ARG_ADD])

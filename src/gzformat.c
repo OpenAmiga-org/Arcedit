@@ -306,7 +306,7 @@ static ARC *gz_open(const char *path, int create, int *err)
    *err = r == -2 ? GZ_ERR_MEM : GZ_ERR_FORMAT;
    goto fail;
   }
-  if(plainlen >= 512 && TarFormat.probe(plain, plainlen) == 2)
+  if(plainlen >= 512 && TarFormat.probe(plain, plainlen) >= 1)
   {
    FILE *t;
    int e;
@@ -608,7 +608,7 @@ static uint32_t gz_quick_caps(const char *path, const uint8_t *head, uint32_t le
  if(head[3] & FHCRC) p += 2;
  if(p < len && inflate_head(head + p, len - p, &plain, &plainlen, 512) == 0)
  {
-  istar = plainlen >= 512 && TarFormat.probe(plain, plainlen) == 2;
+  istar = plainlen >= 512 && TarFormat.probe(plain, plainlen) >= 1;
   free(plain);
  }
  *type = istar ? "TGZ" : "GZIP";
