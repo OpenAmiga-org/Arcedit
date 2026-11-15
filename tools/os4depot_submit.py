@@ -65,6 +65,8 @@ cmd = ["curl", "-sS", "-o", "/dev/stdout", "-w", "\nHTTP %{http_code}\n", "--max
 for name, value in fields:
     cmd += ["--form-string", f"{name}={value}"]
 cmd += ["-F", f"f_userfile=@{ARCHIVE};type=application/x-lha;filename=arcedit.lha", URL]
+# the form is ISO-8859-15: send the values as Latin-1 bytes ("Bj\u00f6rn"), not UTF-8
+cmd = [c.encode("latin-1") for c in cmd]
 out = subprocess.run(cmd, capture_output=True, text=True, encoding="latin-1")
 open(os.path.join(ROOT, "build", "os4depot_response.html"), "w",
      encoding="latin-1").write(out.stdout)

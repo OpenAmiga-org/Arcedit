@@ -2,8 +2,8 @@ name: arcedit
 description: Edit archives (LHA, ZIP, LZX, TAR, GZ) in place
 version: @VERSION@
 date: @DATE@
-author: Bjorn 'Orgin'
-submitter: Bjorn 'Orgin'
+author: Björn Hagström
+submitter: Björn Hagström
 email:
 url:
 category: utility/archive
