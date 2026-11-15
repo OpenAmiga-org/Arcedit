@@ -1,2 +1,4 @@
 bin/
 tests/work/
+build/
+dist/

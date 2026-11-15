@@ -32,9 +32,11 @@ so (LHA as the example):
 - **add** packs only the new files (`-lh5-`, or stored when that is
   smaller) and replaces entries with the same name.
 
-Nothing is unpacked and repacked. The new archive is written next to the
-old one (`<archive>.arcedit`) and replaces it only when everything worked;
-the archive keeps its own protection bits and file note.
+Nothing is unpacked and repacked (except TGZ, which is one packed stream).
+The new archive is written to a temporary file next to the old one
+(`aeXXXXXXXX.tmp`, short enough for any file system) and replaces it only
+when everything worked; the archive keeps its own protection bits and file
+note. Ctrl-C stops arcedit and leaves the archive as it was.
 
 ## Usage
 
@@ -58,7 +60,8 @@ arcedit ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/
   regard to case.
 - `COMMENT` and `PROTECT` can be given together, and take a list (`FROM`)
   like `DELETE`.
-- `ADD` creates the archive when it doesn't exist yet (`.lha`/`.lzh` name).
+- `ADD` creates the archive when it doesn't exist yet (`.lha`, `.lzh`,
+  `.zip`, `.tar`, `.tgz`, `.tar.gz` or `.gz` name).
   Added entries keep the file's protection bits, file note and date. Empty
   drawers get a drawer entry.
 - A rename to a name that's already in the archive is refused.
@@ -123,3 +126,6 @@ python3 tests/corpus.py DIR   # every edit on real archives in DIR, checked with
 | `docs/lha_format.md` | The LHA header details arcedit relies on |
 | `docs/formats.md` | How each format is handled, and its limits |
 | `tests/` | Host tests and sample archives made by LhA 2.15 |
+| `tests/os4/` | Scenario tests in an AmigaOS 4 guest (locks, full and write protected volumes, low memory, Ctrl-C) |
+| `package/` | AmigaOS 4 release: readme, Installer script, documentation, icons |
+| `tools/` | `make_lha.sh` (release archive), `make_icons.py` + `os4/mkicon.c` (release icons) |

@@ -96,6 +96,12 @@ void plat_fault(const char *what, char *buf, uint32_t size)
  IDOS->Fault(IDOS->IoErr(), what, buf, size);
 }
 
+int plat_not_found(void)
+{
+ int32 e = IDOS->IoErr();
+ return e == ERROR_OBJECT_NOT_FOUND || e == ERROR_DIR_NOT_FOUND || e == ERROR_DEVICE_NOT_MOUNTED;
+}
+
 /*
 ** The drawer part of a path into buf ("RAM:x/y.lha" gives "RAM:x")
 */
@@ -261,6 +267,11 @@ void plat_delete(const char *path)
 void plat_fault(const char *what, char *buf, uint32_t size)
 {
  snprintf(buf, size, "%s: %s", what, strerror(errno));
+}
+
+int plat_not_found(void)
+{
+ return errno == ENOENT || errno == ENOTDIR;
 }
 
 static void parent_of(const char *path, char *buf, uint32_t size)

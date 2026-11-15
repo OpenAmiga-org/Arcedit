@@ -1,0 +1,55 @@
+; Install script for arcedit (AmigaOS 4 Installation Utility).
+; Public domain.
+
+(set #app "arcedit")
+(set @app-name "arcedit")
+(set @default-dest "C:")
+; the log Novice mode writes goes to T: (LOGFILE tooltype of the icon)
+
+(welcome
+  (cat "This installs arcedit, a Shell command that edits LHA, ZIP, LZX, "
+       "TAR and GZIP archives without unpacking them."))
+
+; --- the command --------------------------------------------------------
+
+(set #cdir
+  (if (= @user-level 0)
+    "C:"
+    (askdir
+      (prompt "Where should the arcedit command go?\n"
+              "(C: lets every program find it.)")
+      (help @askdir-help)
+      (default "C:"))))
+
+; copylib keeps a newer arcedit that is installed already
+(copylib
+  (prompt (cat "Copying arcedit to " #cdir))
+  (help @copylib-help)
+  (source "C/arcedit")
+  (dest #cdir)
+  (confirm "expert"))
+
+; --- documentation ------------------------------------------------------
+
+(set #docdir
+  (if (= @user-level 0)
+    "SYS:Documentation"
+    (askdir
+      (prompt "Where should the documentation (arcedit.txt) go?")
+      (help @askdir-help)
+      (default "SYS:Documentation"))))
+
+(if (exists #docdir)
+  (copyfiles
+    (prompt "Copying the documentation")
+    (help @copyfiles-help)
+    (source "arcedit.txt")
+    (dest #docdir)
+    (infos)
+    (nogauge))
+)
+
+(exit (cat "arcedit is installed in " #cdir "\n\n"
+           "Type \"arcedit ?\" in a Shell for its arguments, and read "
+           (tackon #docdir "arcedit.txt") " for examples.")
+      (quiet))

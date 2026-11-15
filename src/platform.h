@@ -47,6 +47,9 @@ void plat_delete(const char *path);
 
 /* The message for the last failed system call: "what: reason" into buf */
 void plat_fault(const char *what, char *buf, uint32_t size);
+/* Whether the last failed call failed because the object isn't there (call
+   before anything else changes the error code) */
+int plat_not_found(void);
 
 /* Can the archive be replaced (deleted and written again)? 0 = yes, else
    a reason in buf: delete protected, write protected volume, ... */

@@ -356,7 +356,9 @@ static int write_member(struct gz_archive *g, FILE *out, const uint8_t *packed, 
  uint8_t h[10];
  uint8_t flags = (uint8_t)(g->flags & FTEXT);
  if(g->extra) flags |= FEXTRA;
- if(g->name && g->name[0]) flags |= FNAME;
+ /* the name only when the original had one, or it was set: not one made
+    from the archive's own file name */
+ if(g->name && g->name[0] && (g->flags & FNAME)) flags |= FNAME;
  if(g->comment) flags |= FCOMMENT;
  h[0] = 0x1F;
  h[1] = 0x8B;
@@ -513,6 +515,7 @@ static void gz_set_path(ENTRY *e, const char *path)
   {
    free(g->name);
    g->name = p;
+   g->flags |= FNAME;
   }
  }
 }
@@ -568,6 +571,7 @@ static int gz_add(ARC *arc, const char *path, const uint8_t *buf, uint32_t len,
  base = base ? base + 1 : path;
  free(g->name);
  g->name = strndup2(base, strlen(base));
+ g->flags |= FNAME;
  if(comment && comment[0])
  {
   free(g->comment);

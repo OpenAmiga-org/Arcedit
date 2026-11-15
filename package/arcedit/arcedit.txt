@@ -1,0 +1,143 @@
+arcedit @VERSION@ (@AMIGADATE@)
+==============================
+
+arcedit edits archives without unpacking them: it renames, deletes and
+adds entries, and changes their comments (file notes) and protection
+bits. It is a Shell command for AmigaOS 4. arcedit is public domain.
+
+
+Formats
+-------
+
+  Format              Delete Rename Comment Protect Add
+  LHA (.lha, .lzh)    yes    yes    yes     yes     packed (-lh5-)
+  ZIP (.zip)          yes    yes    yes     yes     packed (Deflate)
+  LZX (.lzx)          yes *  yes    yes     yes     stored
+  TAR (.tar)          yes    yes    yes **  owner   yes
+  TGZ (.tgz, .tar.gz) yes    yes    yes **  owner   packed
+  GZIP (.gz)          -      name   yes     -       replaces the file
+
+  *  not one file out of a merged group (LZX packs several files into
+     one block; all files of such a group can be deleted together)
+  ** stored as a pax "comment" record; TAR and TGZ have only the owner's
+     r, w and e protection bits
+
+LHA archives of every header level (0, 1, 2) and self-extracting LHA
+archives work. ZIP archives over 4 GB (ZIP64) are not supported.
+
+
+How it works
+------------
+
+Archives are lists of entries, each a header followed by that file's own
+packed data. So:
+
+- DELETE copies the other entries byte for byte and leaves the deleted
+  ones out,
+- RENAME, COMMENT and PROTECT rewrite only the headers of the changed
+  entries,
+- ADD packs only the new files and replaces entries with the same name.
+
+Nothing is unpacked and packed again (except TGZ, where the whole archive
+is one packed stream: it is unpacked to a temporary file in the same
+drawer and packed again).
+
+The new archive is written to a temporary file next to the old one
+(aeXXXXXXXX.tmp) and replaces the old one only when everything worked.
+The archive keeps its protection bits and file note. Before writing,
+arcedit checks that the archive can be replaced and that there is enough
+free space. Ctrl-C stops arcedit; the archive stays as it was.
+
+
+Usage
+-----
+
+  arcedit ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,
+          ADD/S,TO/K,FROM=LIST/K,INFO/S,QUIET/S
+
+  arcedit Work:a.lha docs readme.txt DELETE
+      Delete entries. A drawer name deletes everything in it.
+
+  arcedit Work:a.lha DELETE FROM RAM:list
+      Delete the entries listed in a file, one per line.
+
+  arcedit Work:a.lha RENAME docs/a.txt AS docs/b.txt
+      Rename (or move) a file.
+
+  arcedit Work:a.lha RENAME docs AS Documentation
+      Rename a drawer with everything in it.
+
+  arcedit Work:a.lha docs/a.txt COMMENT "text"
+      Set the file note ("" clears it).
+
+  arcedit Work:a.lha docs/a.txt PROTECT rwed
+      Set the protection bits exactly.
+
+  arcedit Work:a.lha docs/a.txt PROTECT +s-d
+      Add or remove protection bits (hsparwed).
+
+  arcedit Work:a.lha ADD RAM:x RAM:Drawer TO docs
+      Add files and drawers (with their contents) below docs.
+
+  arcedit Work:a.zip INFO
+      Show the format and the operations the archive allows.
+
+- Entry names are archive paths with / between drawers. Upper and lower
+  case don't matter.
+- COMMENT and PROTECT can be given together, and take a list (FROM) like
+  DELETE.
+- ADD creates the archive when it doesn't exist yet (a .lha, .lzh, .zip,
+  .tar, .tgz or .gz name). Added entries keep the file's protection bits,
+  file note and date. Empty drawers get a drawer entry.
+- A rename to a name that's already in the archive is refused.
+- QUIET prints only errors.
+
+
+Return codes
+------------
+
+   0  done
+   5  some entries weren't in the archive (the others were done); the
+      output has a "Warning:" line for each
+  10  nothing was changed: bad arguments, an archive error, not enough
+      space; the last line of the output is "Error: <message>"
+  20  out of memory; nothing was changed
+
+
+Using arcedit from other programs
+---------------------------------
+
+"arcedit <archive> INFO" prints one line: the archive type and the
+operations this archive allows, for example
+
+  ZIP: DELETE RENAME COMMENT PROTECT ADD
+
+INFO reads only the first bytes of the archive and checks that the
+archive can be replaced (not delete protected, volume not write
+protected), so it is fast for any archive size. An archive that can't be
+changed gives just the type ("LHA:"). A file that isn't an archive
+arcedit knows gives return code 10.
+
+An operation INFO listed can still fail for reasons only that operation
+finds: a damaged archive, not enough free space or memory, an added file
+over 4 GB, one file out of an LZX merged group. arcedit checks these
+before it writes anything. Then the last line of the output is
+"Error: <message>", the return code is 10 (20 when out of memory), and
+the archive is unchanged. A program can show that message as it is.
+
+Entry lists for DELETE, COMMENT and PROTECT can be passed in a file
+(FROM), one entry per line, so any number of entries can be handled.
+
+
+Names
+-----
+
+Entry names inside archives are in the Amiga character set (ISO-8859-1),
+as on the Amiga.
+
+
+Author
+------
+
+orgin. All code is written for arcedit, including the Deflate and -lh5-
+packers, so arcedit can be public domain.

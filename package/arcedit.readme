@@ -1,0 +1,90 @@
+name: arcedit
+description: Edits LHA, ZIP, LZX, TAR and GZIP archives without unpacking
+version: @VERSION@
+date: @DATE@
+author: Bjorn 'Orgin'
+submitter: Bjorn 'Orgin'
+email:
+url:
+category: utility/archive
+replaces:
+requirements:
+license: Public domain
+minosversion: 4.1
+texttype: Markdown
+distribute: yes
+hend:
+
+**arcedit** changes archives in place, without unpacking and repacking
+them: rename, delete and add entries, and change their comments (file
+notes) and protection bits. It is a Shell command, so file managers and
+scripts can use it too, like they use LhA.
+
+### What it can do
+
+| Format | Delete | Rename | Comment | Protection | Add |
+|---|---|---|---|---|---|
+| LHA (.lha, .lzh) | yes | yes | yes | yes | yes, packed |
+| ZIP (.zip) | yes | yes | yes | yes | yes, packed |
+| LZX (.lzx) | yes, except part of a merged group | yes | yes | yes | yes, stored |
+| TAR (.tar) | yes | yes | yes | owner rwe | yes |
+| TGZ (.tgz, .tar.gz) | yes | yes | yes | owner rwe | yes, packed |
+| GZIP (.gz) | - | stored name | yes | - | replaces the file |
+
+- Only the changed parts are written: a delete copies the other entries
+  byte for byte, a rename or comment rewrites only that entry's header, an
+  add packs only the new files. Changing one comment in a 100 MB archive
+  takes a moment, not a full repack.
+- Self-extracting LHA archives and all LHA header levels (0, 1, 2) work.
+- Drawers: deleting or renaming a drawer changes everything in it; added
+  drawers come with all their contents.
+- Added files keep their protection bits, file note and date.
+- **Safe**: the new archive is written to a temporary file next to the old
+  one and replaces it only when everything worked. Before writing,
+  arcedit checks free space, write protection and memory. Ctrl-C stops it
+  and leaves the archive as it was.
+- No libraries needed.
+
+### Examples
+
+```
+arcedit Work:a.lha docs/old.txt DELETE
+arcedit Work:a.lha DELETE FROM RAM:list
+arcedit Work:a.lha RENAME docs/a.txt AS docs/b.txt
+arcedit Work:a.zip docs/a.txt COMMENT "a note"
+arcedit Work:a.lzx docs/a.txt PROTECT +s-d
+arcedit Work:a.lha ADD RAM:new.txt RAM:Drawer TO docs
+arcedit Work:a.zip INFO
+```
+
+Template:
+
+```
+ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/K,FROM=LIST/K,INFO/S,QUIET/S
+```
+
+### For programs that use arcedit
+
+`arcedit <archive> INFO` prints one line, the archive type and the
+operations this archive allows, for example
+`ZIP: DELETE RENAME COMMENT PROTECT ADD`. It reads only the first bytes of
+the archive, so it is instant for any archive size, and lists nothing when
+the archive can't be replaced (write protected volume, delete protected
+archive).
+
+When an operation fails, the last line of the output is
+`Error: <message>`, the return code is 10 (20 when out of memory) and the
+archive is unchanged. Return code 5 with `Warning:` lines means some
+entries weren't in the archive; the others were done.
+
+### Installation
+
+Double-click Install, or copy C/arcedit to C:. The documentation is in
+arcedit.txt.
+
+### History
+
+- @VERSION@ (@DATE@): first release.
+
+arcedit is public domain, all its code is written for it (the Deflate and
+-lh5- packers too).

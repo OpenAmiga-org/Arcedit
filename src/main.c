@@ -48,7 +48,7 @@
 #define RETURN_FAIL  20
 #endif
 
-#define VERSION_STRING "arcedit 1.0 (14.11.2026)"
+#define VERSION_STRING "arcedit 1.0 (15.11.2026)"
 
 static const char __attribute__((used)) verstag[] = "\0$VER: " VERSION_STRING;
 /* the shell gives commands this much stack at least */
@@ -74,6 +74,7 @@ static const struct arc_format *Formats[] =
 };
 
 static int Quiet = 0;
+static int NoMemory = 0;   /* an error was a lack of memory: return code 20 */
 
 /*
 ** Errors: one line starting with "Error: ", the last line of the output,
@@ -82,12 +83,15 @@ static int Quiet = 0;
 */
 static void error(const char *fmt, ...)
 {
+ char buf[1024];
  va_list ap;
  va_start(ap, fmt);
- printf("Error: ");
- vprintf(fmt, ap);
- printf("\n");
+ vsnprintf(buf, sizeof(buf), fmt, ap);
  va_end(ap);
+ printf("Error: %s\n", buf);
+ /* the formats' and the system's texts for it */
+ if(strstr(buf, "out of memory") || strstr(buf, "not enough memory") || strstr(buf, "Cannot allocate memory"))
+  NoMemory = 1;
 }
 
 /* The last failed system call as an error */
@@ -767,12 +771,12 @@ int main(int argc, char **argv)
  f = find_format(archive, args[ARG_ADD] != NULL, &exists);
  if(f == NULL)
  {
-  struct plat_info pi;
   char why[512];
-  plat_fault(archive, why, sizeof(why));   /* before other calls change the error code */
+  int missing = plat_not_found();   /* before other calls change the error code */
+  plat_fault(archive, why, sizeof(why));
   if(exists) error("%s is not an archive type arcedit knows", archive);
-  else if(plat_info(archive, &pi) == 0) error("%s", why);   /* there, but can't be read (in use) */
-  else error("%s doesn't exist", archive);
+  else if(missing) error("%s doesn't exist", archive);
+  else error("%s", why);   /* there, but can't be read (in use, no access, ...) */
   goto done;
  }
 
@@ -895,6 +899,7 @@ int main(int argc, char **argv)
  }
 
 done:
+ if(rc == RETURN_ERROR && NoMemory) rc = RETURN_FAIL;
  if(arc) f->close(arc);
  names_free(&names);
 #ifdef __amigaos4__

@@ -14,7 +14,7 @@ Scenarios:
  4. a write-protected volume
  5. a full volume (a 1 MB RAM drive)
  6. a 30 character archive name on FFS
- 7. low memory (memeater leaves 3 MB free)
+ 7. low memory (memeater leaves 24 MB of private memory)
  8. edits on Work: and System: (their own file systems)
 """
 import asyncio
@@ -169,12 +169,14 @@ async def tiny_volume(g):
             break
     else:
         return False
-    text = re.sub(r"(?im)^\s*Unit\s*=.*$", "Unit = 3", text)
-    text = re.sub(r"(?im)^\s*HighCyl\s*=.*$", "HighCyl = 20", text)   # 21 cylinders x 50 KB or so
-    text = re.sub(r"(?im)^\s*Activate\s*=.*$", "", text)
+    # RAD's file leaves Unit/LowCyl/HighCyl to icon tooltypes; a classic
+    # mountlist entry with them filled in (90 cylinders x 11 KB, about 1 MB)
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    text = re.sub(r"(?im)^\s*(Unit|LowCyl|HighCyl|Activate|BootPri)\s*=.*$", "", text)
+    text = "\n".join(l for l in text.splitlines() if l.strip())
     path = os.path.join(WORK, "TINY.mountlist")
     with open(path, "w") as fh:
-        fh.write(text + "\nActivate = 1\n")
+        fh.write("TINY:\n" + text + "\nUnit = 3\nLowCyl = 0\nHighCyl = 89\nActivate = 1\n#\n")
     await g.up(path, f"{G}/TINY")
     rc, out = await g.cmd(f"Mount TINY: FROM {G}/TINY")
     rc2, out2 = await g.cmd("Info TINY:")
@@ -205,7 +207,7 @@ async def full_volume(g, have_tiny):
     await g.cmd("Delete TINY:#? ALL QUIET")
     big = os.path.join(WORK, "rand.bin")
     with open(big, "wb") as fh:
-        fh.write(os.urandom(700_000))
+        fh.write(os.urandom(1_500_000))   # more than TINY: (about 1 MB) holds
     await g.up(big, f"{G}/rand.bin")
     await g.up(os.path.join(SAMPLES, "real_lzB.lzx"), "TINY:full.lzx")
     before = await g.sha("TINY:full.lzx")
@@ -236,38 +238,56 @@ async def ffs_name(g, have_tiny):
 
 
 async def low_memory(g):
+    """memeater takes all private memory and gives 24 MB back (less starves
+    MCPd, the test's own link to the guest); arcedit then adds 40 MB. Each operation must either work
+    (LhA t passes) or fail with an Error and leave the archive unchanged."""
     print("-- 7. low memory")
     big = os.path.join(WORK, "rand8.bin")
     with open(big, "wb") as fh:
         fh.write(os.urandom(8_000_000))
     await g.up(big, f"{G}/rand8.bin")
+    r8 = f"{G}/rand8.bin"
+    await g.cmd(f"Join {r8} {r8} {r8} {r8} {r8} AS {G}/rand40.bin")
     await g.up(os.path.join(SAMPLES, "h1.lha"), f"{G}/mem.lha")
     await g.up(os.path.join(SAMPLES, "g_tar.tgz"), f"{G}/mem.tgz")
     before = await g.sha(f"{G}/mem.lha")
-    await g.cmd(f"Run >{G}/eat.txt {G}/memeater 3000")
-    await asyncio.sleep(3)
-    rc, eat = await g.cmd(f"Type {G}/eat.txt")
+    await g.cmd(f"Delete {G}/eat.txt QUIET")
+    await g.cmd(f"Run >NIL: {G}/memeater 24000 {G}/eat.txt")
+    eat = ""
+    for _ in range(30):
+        await asyncio.sleep(2)
+        rc, eat = await g.cmd(f"Type {G}/eat.txt")
+        if "holding" in eat:
+            break
     print(eat.strip())
-    rc, out = await g.ae(f"{G}/mem.lha ADD {G}/rand8.bin")
-    ok("low memory: ADD of 8 MB fails cleanly", rc in (10, 20) and "Error:" in out, out.strip())
-    ok("low memory: archive unchanged", before == await g.sha(f"{G}/mem.lha"))
+    ok("low memory: memeater holds the memory", "holding" in eat, eat.strip())
+
+    rc, out = await g.ae(f"{G}/mem.lha ADD {G}/rand40.bin", timeout=600)
+    print(f"  ADD: rc {rc}: {out.strip()[-200:]}")
+    if rc == 0:
+        rct, _ = await g.cmd(f"LhA t {G}/mem.lha")
+        ok("low memory: ADD of 40 MB worked, LhA t passes", rct == 0, out.strip())
+    else:
+        ok("low memory: ADD of 40 MB failed cleanly", rc in (10, 20) and "Error:" in out, out.strip())
+        ok("low memory: archive unchanged", before == await g.sha(f"{G}/mem.lha"))
+    ok("low memory: no temp", not await g.leftovers(G + "/"))
     rc, out = await g.ae(f"{G}/mem.lha a.txt DELETE")
-    ok("low memory: DELETE still works", rc == 0, out.strip())
+    ok("low memory: DELETE works", rc == 0, out.strip())
     rc, out = await g.ae(f"{G}/mem.tgz a.txt COMMENT x")
     ok("low memory: small TGZ edit", rc == 0, out.strip())
     rc, out = await g.cmd("Status COMMAND=" + G + "/memeater")
-    num = re.search(r"(\d+)", out)
-    if num:
-        await g.cmd(f"Break {num.group(1)} C")
-    await asyncio.sleep(2)
+    for num in re.findall(r"(\d+)", out):
+        await g.cmd(f"Break {num} C")
+    await asyncio.sleep(3)
     rc, eat = await g.cmd(f"Type {G}/eat.txt")
     ok("low memory: memeater gave the memory back", "given back" in eat, eat.strip())
+    await g.cmd(f"Delete {G}/rand40.bin {G}/rand8.bin QUIET")
 
 
 async def volumes(g):
     print("-- 8. Work: and System:")
-    for vol in ("Work:", "SYS:T"):
-        dst = f"{vol}/ae_vol_test.lha" if vol.endswith("T") else f"{vol}ae_vol_test.lha"
+    for vol in ("Work:", "SYS:"):   # SYS:T may not exist; the test file is deleted again
+        dst = f"{vol}ae_vol_test.lha"
         await g.up(os.path.join(SAMPLES, "h2.lha"), dst)
         rc1, o1 = await g.ae(f"{dst} a.txt COMMENT vol")
         rc2, o2 = await g.ae(f"{dst} RENAME sub AS Drawer")
