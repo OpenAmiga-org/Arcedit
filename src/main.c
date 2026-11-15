@@ -48,7 +48,7 @@
 #define RETURN_FAIL  20
 #endif
 
-#define VERSION_STRING "arcedit 1.0 (15.11.2026)"
+#define VERSION_STRING "arcedit 1.0.1 (15.11.2026)"
 
 static const char __attribute__((used)) verstag[] = "\0$VER: " VERSION_STRING;
 /* the shell gives commands this much stack at least */

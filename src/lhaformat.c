@@ -7,6 +7,7 @@
 **  2026-11-14 orgin, created
 */
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "arcformat.h"
@@ -98,13 +99,43 @@ static uint8_t lhaf_get_protection(ENTRY *e)
  return amiga_attr(m) ? m->attr : 0;   /* 0: rwed allowed, nothing else set */
 }
 
+/*
+** Remove the Unix permission header (0x50): readers such as xadmaster take
+** the protection from it whenever it is there, so after a PROTECT it would
+** hide the new Amiga bits. Owner, group and times (0x51, 0x54) stay.
+*/
+static int drop_unix_mode(struct lha_member *m)
+{
+ struct lha_ext **link = &m->extras;
+ int dropped = 0;
+ while(*link)
+ {
+  if((*link)->type == 0x50)
+  {
+   struct lha_ext *e = *link;
+   *link = e->next;
+   free(e->data);
+   free(e);
+   dropped = 1;
+  }
+  else
+  {
+   link = &(*link)->next;
+  }
+ }
+ return dropped;
+}
+
 static void lhaf_set_protection(ENTRY *e, uint8_t prot)
 {
  struct lha_member *m = e;
+ if(drop_unix_mode(m))
+ {
+  m->modified = 1;
+ }
  if(!amiga_attr(m))
  {
-  /* make LhA use the new bits; extended headers of the other system
-     (Unix permissions etc) are kept for its own tools */
+  /* an Amiga entry from now on, so LhA uses the new bits */
   m->os = 'A';
   m->attr = prot;
   m->modified = 1;

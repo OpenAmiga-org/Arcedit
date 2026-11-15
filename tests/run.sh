@@ -148,6 +148,8 @@ if [ -x "$LHAUNIX" ]; then
  # protection of a non-Amiga entry: starts from ----rwed, entry becomes Amiga
  $AE $W/e.lha in/Deep/er/one PROTECT +s QUIET
  check "unix: protect" "$INFO $W/e.lha | grep -q '^in/Deep/er/one|2|-lh0-|-s--rwed|'"
+ # its Unix permission header is gone, or readers like xadmaster and lhasa would still show the old bits
+ check "unix: protect drops unix mode" "lha l $W/e.lha | grep 'in/Deep/er/one' | grep -q '^\[Amiga\]'"
  # packing within 1% of LHa for UNIX -o5 on the same files
  (cd $W && "$LHAUNIX" -ao5q ref.lha in/deep/er/source.c && $AE ae.lha ADD in/deep/er/source.c QUIET)
  check "unix: packing close to lha" "[ \$(stat -c %s $W/ae.lha) -le \$(( \$(stat -c %s $W/ref.lha) * 101 / 100 + 64 )) ]"

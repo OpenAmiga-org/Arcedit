@@ -1,5 +1,5 @@
 name: arcedit
-description: Edits LHA, ZIP, LZX, TAR and GZIP archives without unpacking
+description: Edit archives (LHA, ZIP, LZX, TAR, GZ) in place
 version: @VERSION@
 date: @DATE@
 author: Bjorn 'Orgin'
@@ -84,7 +84,10 @@ arcedit.txt.
 
 ### History
 
-- @VERSION@ (@DATE@): first release.
+- @VERSION@ (@DATE@): PROTECT on an LHA entry made on Unix removes its
+  Unix permission header, so xadmaster and other readers show the new
+  bits.
+- 1.0 (2026-11-15): first release.
 
 arcedit is public domain, all its code is written for it (the Deflate and
 -lh5- packers too).
