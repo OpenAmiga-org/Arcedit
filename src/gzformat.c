@@ -311,8 +311,8 @@ static ARC *gz_open(const char *path, int create, int *err)
    FILE *t;
    int e;
    uint64_t freebytes;
-   /* room for the unpacked tar next to the archive */
-   if(plat_free_space(path, &freebytes) == 0 && freebytes < (uint64_t)plainlen + 65536)
+   /* room for the unpacked tar where the temporary files go */
+   if(plat_temp_free_space(path, &freebytes) == 0 && freebytes < (uint64_t)plainlen + 65536)
    {
     free(plain);
     *err = GZ_ERR_SPACE;

@@ -363,5 +363,32 @@ check "utf-8 name matches latin-1" "[ \$? -eq 0 ]"
 $AE $W/u.lha "$L1" DELETE QUIET
 check "latin-1 name matches" "[ \$? -eq 0 ] && lha t $W/u.lha >/dev/null 2>&1 && ! $INFO $W/u.lha | iconv -f utf-8 -t latin1 | grep -q '^$L1|'"
 
+# WORKDIR: temporary files in another drawer; the archive's own drawer and
+# the work drawer are left clean
+mkdir -p $W/wd
+cp tests/samples/h1.lha $W/w.lha
+$AE $W/w.lha a.txt COMMENT "via workdir" WORKDIR $W/wd QUIET
+check "workdir same volume" "[ \$? -eq 0 ] && lhatest $W/w.lha && $INFO $W/w.lha | grep -q '|via workdir\$' && [ -z \"\$(ls $W/wd)\" ] && ! ls $W/ae*.tmp >/dev/null 2>&1"
+XD=/dev/shm/arcedit-test-$$
+if mkdir -p $XD 2>/dev/null && [ "$(stat -c %d $XD)" != "$(stat -c %d $W)" ]; then
+ cp tests/samples/z_amiga.zip $W/w.zip
+ $AE $W/w.zip ADD src/lha.h WORKDIR $XD QUIET
+ check "workdir other volume" "[ \$? -eq 0 ] && unzip -tq $W/w.zip >/dev/null 2>&1 && unzip -l $W/w.zip | grep -q 'lha.h' && [ -z \"\$(ls $XD)\" ] && ! ls $W/ae*.tmp >/dev/null 2>&1"
+ # TGZ: the unpacked tar goes to the work drawer too
+ cp tests/samples/g_tar.tgz $W/w.tgz
+ $AE $W/w.tgz ADD src/lha.h WORKDIR $XD QUIET
+ check "workdir tgz" "[ \$? -eq 0 ] && tar tzf $W/w.tgz | grep -q 'lha.h' && [ -z \"\$(ls $XD)\" ] && ! ls $W/ae*.tmp >/dev/null 2>&1"
+ rm -rf $XD
+else
+ echo "(no second file system at /dev/shm, the cross-volume WORKDIR test skipped)"
+fi
+sum=$(md5sum < $W/w.lha)
+$AE $W/w.lha a.txt DELETE WORKDIR $W/nosuch > $W/err.txt
+check "workdir missing" "[ \$? -eq 10 ] && tail -1 $W/err.txt | grep -q \"^Error: work drawer $W/nosuch doesn't exist\" && [ \"\$(md5sum < $W/w.lha)\" = \"$sum\" ]"
+$AE $W/w.lha a.txt DELETE WORKDIR $W/w.lha > $W/err.txt
+check "workdir not a drawer" "[ \$? -eq 10 ] && tail -1 $W/err.txt | grep -q 'is not a drawer' && [ \"\$(md5sum < $W/w.lha)\" = \"$sum\" ]"
+check "workdir empty = default" "$AE $W/w.lha a.txt COMMENT y WORKDIR '' QUIET && $INFO $W/w.lha | grep -q '|y\$'"
+check "info with workdir" "$AE $W/w.lha INFO WORKDIR $W/nosuch | grep -q '^LHA: DELETE'"
+
 echo "passed $pass, failed $fail"
 [ $fail -eq 0 ]

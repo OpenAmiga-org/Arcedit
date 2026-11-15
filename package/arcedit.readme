@@ -42,7 +42,8 @@ scripts can use it too, like they use LhA.
 - **Safe**: the new archive is written to a temporary file next to the old
   one and replaces it only when everything worked. Before writing,
   arcedit checks free space, write protection and memory. Ctrl-C stops it
-  and leaves the archive as it was.
+  and leaves the archive as it was. WORKDIR puts the temporary files in
+  another drawer.
 - No libraries needed.
 
 ### Examples
@@ -55,12 +56,13 @@ arcedit Work:a.zip docs/a.txt COMMENT "a note"
 arcedit Work:a.lzx docs/a.txt PROTECT +s-d
 arcedit Work:a.lha ADD RAM:new.txt RAM:Drawer TO docs
 arcedit Work:a.zip INFO
+arcedit Work:a.lha docs DELETE WORKDIR RAM:
 ```
 
 Template:
 
 ```
-ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/K,FROM=LIST/K,INFO/S,QUIET/S
+ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/K,FROM=LIST/K,INFO/S,WORKDIR/K,QUIET/S
 ```
 
 ### For programs that use arcedit
@@ -84,9 +86,9 @@ arcedit.txt.
 
 ### History
 
-- @VERSION@ (@DATE@): PROTECT on an LHA entry made on Unix removes its
-  Unix permission header, so xadmaster and other readers show the new
-  bits.
+- @VERSION@ (@DATE@): WORKDIR keeps the temporary files in another
+  drawer. PROTECT on an LHA entry made on Unix removes its Unix permission
+  header, so xadmaster and other readers show the new bits.
 - 1.0 (2026-11-15): first release.
 
 arcedit is public domain, all its code is written for it (the Deflate and

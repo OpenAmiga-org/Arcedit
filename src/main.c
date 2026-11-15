@@ -4,7 +4,7 @@
 **
 **  Template:
 **   ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,
-**   TO/K,FROM=LIST/K,QUIET/S
+**   TO/K,FROM=LIST/K,INFO/S,WORKDIR/K,QUIET/S
 **
 **  arcedit Work:a.lha docs readme.txt DELETE     delete entries (a drawer
 **                                                 with all it holds)
@@ -20,13 +20,16 @@
 **  Unchanged entries are copied as they are, only added files are packed.
 **  The archive is written to a temporary file in the same drawer first
 **  (a short name, aeXXXXXXXX.tmp) and replaces the original only when
-**  everything worked. Ctrl-C stops it before the replace.
+**  everything worked. Ctrl-C stops it before the replace. WORKDIR puts the
+**  temporary files in another drawer; the new archive is then moved next
+**  to the old one (copied when on another volume) before it replaces it.
 **
 **  Return codes: 0 OK, 5 some entries weren't found, 10 nothing was done
 **  (bad arguments, archive errors), 20 out of memory.
 **
 ** Change history:
 **  2026-11-14 orgin, created
+**  2026-11-15 orgin, WORKDIR
 */
 
 #include <stdio.h>
@@ -48,18 +51,18 @@
 #define RETURN_FAIL  20
 #endif
 
-#define VERSION_STRING "arcedit 1.0.1 (15.11.2026)"
+#define VERSION_STRING "arcedit 1.1 (15.11.2026)"
 
 static const char __attribute__((used)) verstag[] = "\0$VER: " VERSION_STRING;
 /* the shell gives commands this much stack at least */
 static const char __attribute__((used)) stackcookie[] = "$STACK: 65536";
 
-#define TEMPLATE "ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/K,FROM=LIST/K,INFO/S,QUIET/S"
+#define TEMPLATE "ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/K,FROM=LIST/K,INFO/S,WORKDIR/K,QUIET/S"
 
 enum
 {
  ARG_ARCHIVE, ARG_ENTRIES, ARG_DELETE, ARG_RENAME, ARG_AS, ARG_COMMENT, ARG_PROTECT,
- ARG_ADD, ARG_TO, ARG_LIST, ARG_INFO, ARG_QUIET, ARG_COUNT
+ ARG_ADD, ARG_TO, ARG_LIST, ARG_INFO, ARG_WORKDIR, ARG_QUIET, ARG_COUNT
 };
 
 /* Archive formats, tried in this order */
@@ -126,7 +129,7 @@ static void warning(const char *fmt, ...)
 static int host_readargs(int argc, char **argv, void **args)
 {
  static const char *keys[ARG_COUNT] = { "ARCHIVE", "ENTRIES", "DELETE", "RENAME", "AS", "COMMENT",
-                                        "PROTECT", "ADD", "TO", "FROM", "INFO", "QUIET" };
+                                        "PROTECT", "ADD", "TO", "FROM", "INFO", "WORKDIR", "QUIET" };
  static char *multi[256];
  int i, nmulti = 0;
 
@@ -698,7 +701,8 @@ int main(int argc, char **argv)
  const struct arc_format *f;
  ARC *arc = NULL;
  const char *archive;
- char tmp[1024];
+ char tmp[1024], near[1024];
+ const char *workdir;
  int rc = RETURN_ERROR, changed = 0, exists, err, ops, i;
  uint64_t added = 0;
 #ifdef __amigaos4__
@@ -807,6 +811,23 @@ int main(int argc, char **argv)
   }
  }
 
+ /* the work drawer for temporary files (also for TGZ's unpacked tar) */
+ workdir = args[ARG_WORKDIR];
+ if(workdir && workdir[0])
+ {
+  char why[1200];
+  if(plat_check_workdir(workdir, why, sizeof(why)) != 0)
+  {
+   error("%s", why);
+   goto done;
+  }
+  plat_set_workdir(workdir);
+ }
+ else
+ {
+  workdir = NULL;
+ }
+
  arc = f->open(archive, args[ARG_ADD] != NULL, &err);
  if(arc == NULL)
  {
@@ -863,12 +884,21 @@ int main(int argc, char **argv)
  {
   /* room for the new archive (at most the old one plus what was added)
      next to the old one, before anything is written */
-  uint64_t freebytes, need = plat_size(archive) + added + 65536;
+  uint64_t freebytes, base = plat_size(archive) + added + 65536, need = base;
   if(f->extra_space) need += f->extra_space(arc) + added;
-  if(plat_free_space(archive, &freebytes) == 0 && freebytes < need)
+  if(plat_temp_free_space(archive, &freebytes) == 0 && freebytes < need)
+  {
+   error("not enough free space%s: %lu KB needed, %lu KB free",
+         workdir ? " in the work drawer" : "",
+         (unsigned long)(need / 1024), (unsigned long)(freebytes / 1024));
+   rc = RETURN_ERROR;
+   goto done;
+  }
+  /* with a work drawer the new archive is also moved next to the old one */
+  if(workdir && plat_free_space(archive, &freebytes) == 0 && freebytes < base)
   {
    error("not enough free space: %lu KB needed, %lu KB free",
-         (unsigned long)(need / 1024), (unsigned long)(freebytes / 1024));
+         (unsigned long)(base / 1024), (unsigned long)(freebytes / 1024));
    rc = RETURN_ERROR;
    goto done;
   }
@@ -890,7 +920,21 @@ int main(int argc, char **argv)
    plat_delete(tmp);
    rc = RETURN_ERROR;
   }
-  else if(plat_replace(tmp, archive) != 0)
+  else if(workdir && (plat_temp_name_near(archive, near, sizeof(near)), plat_move(tmp, near) != 0))
+  {
+   /* from the work drawer next to the archive first: a failed copy leaves
+      the archive as it was */
+   error_fault(archive);
+   plat_delete(tmp);
+   rc = RETURN_ERROR;
+  }
+  else if(workdir && plat_replace(near, archive) != 0)
+  {
+   error_fault(archive);
+   plat_delete(near);
+   rc = RETURN_ERROR;
+  }
+  else if(!workdir && plat_replace(tmp, archive) != 0)
   {
    error_fault(archive);
    plat_delete(tmp);

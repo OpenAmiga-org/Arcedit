@@ -62,9 +62,27 @@ int plat_free_space(const char *path, uint64_t *bytes);
 /* Size of a file, 0 when it can't be examined */
 uint64_t plat_size(const char *path);
 
-/* A unique temporary file name in the drawer of path, short enough for
-   any file system (FFS: 30 characters) */
+/* The drawer for temporary files (WORKDIR); NULL or "" = the archive's own
+   drawer, the default */
+void plat_set_workdir(const char *dir);
+
+/* Is dir an existing drawer that can be written? 0 = yes, else a reason in
+   buf */
+int plat_check_workdir(const char *dir, char *buf, uint32_t size);
+
+/* A unique temporary file name in the work drawer (or the drawer of path
+   when none is set), short enough for any file system (FFS: 30 characters) */
 void plat_temp_name(const char *path, char *buf, uint32_t size);
+
+/* The same, always in the drawer of path (the last step before replacing) */
+void plat_temp_name_near(const char *path, char *buf, uint32_t size);
+
+/* Free bytes where the temporary files go, as plat_free_space() */
+int plat_temp_free_space(const char *path, uint64_t *bytes);
+
+/* Move a file: rename, or copy and delete when from and to are on different
+   volumes. On failure nothing is left at to. Returns 0 on success. */
+int plat_move(const char *from, const char *to);
 
 /* TRUE once the user pressed Ctrl-C (stays TRUE) */
 int plat_break(void);

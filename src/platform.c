@@ -143,13 +143,11 @@ int plat_writable(const char *path, char *buf, uint32_t size)
  return rc;
 }
 
-int plat_free_space(const char *path, uint64_t *bytes)
+static int space_of_dir(const char *dir, uint64_t *bytes)
 {
  struct InfoData *id = IDOS->AllocDosObject(DOS_INFODATA, NULL);
- char dir[1024];
  int rc = -1;
  if(id == NULL) return -1;
- parent_of(path, dir, sizeof(dir));
  if(IDOS->GetDiskInfoTags(GDI_StringNameInput, dir[0] ? dir : "", GDI_InfoData, id, TAG_END))
  {
   /* RAM: and other growing volumes always report themselves full: unknown */
@@ -175,15 +173,107 @@ uint64_t plat_size(const char *path)
  return size;
 }
 
+int plat_free_space(const char *path, uint64_t *bytes)
+{
+ char dir[1024];
+ parent_of(path, dir, sizeof(dir));
+ return space_of_dir(dir, bytes);
+}
+
+static char WorkDir[1024];
+
+void plat_set_workdir(const char *dir)
+{
+ IUtility->Strlcpy(WorkDir, dir ? dir : "", sizeof(WorkDir));
+}
+
+int plat_check_workdir(const char *dir, char *buf, uint32_t size)
+{
+ struct ExamineData *dat = IDOS->ExamineObjectTags(EX_StringNameInput, dir, TAG_END);
+ struct InfoData *id;
+ int rc = 0;
+ if(dat == NULL)
+ {
+  if(plat_not_found()) snprintf(buf, size, "work drawer %s doesn't exist", dir);
+  else IDOS->Fault(IDOS->IoErr(), dir, buf, size);
+  return 1;
+ }
+ if(!EXD_IS_DIRECTORY(dat))
+ {
+  snprintf(buf, size, "work drawer %s is not a drawer", dir);
+  rc = 1;
+ }
+ IDOS->FreeDosObject(DOS_EXAMINEDATA, dat);
+ if(rc) return rc;
+ id = IDOS->AllocDosObject(DOS_INFODATA, NULL);
+ if(id && IDOS->GetDiskInfoTags(GDI_StringNameInput, dir, GDI_InfoData, id, TAG_END))
+ {
+  if(id->id_DiskState == ID_DISKSTATE_WRITE_PROTECTED)
+  {
+   snprintf(buf, size, "the volume of work drawer %s is write protected", dir);
+   rc = 1;
+  }
+ }
+ if(id) IDOS->FreeDosObject(DOS_INFODATA, id);
+ return rc;
+}
+
 static uint32_t TempCount;
 
-void plat_temp_name(const char *path, char *buf, uint32_t size)
+static void temp_in(const char *dir, char *buf, uint32_t size)
 {
  char name[32];
  uint32_t id = (uint32_t)IExec->FindTask(NULL) ^ (++TempCount * 0x9E3779B9u);
- parent_of(path, buf, size);
+ IUtility->Strlcpy(buf, dir, size);
  snprintf(name, sizeof(name), "ae%08lx.tmp", (unsigned long)id);
  IDOS->AddPart(buf, name, size);
+}
+
+void plat_temp_name_near(const char *path, char *buf, uint32_t size)
+{
+ char dir[1024];
+ parent_of(path, dir, sizeof(dir));
+ temp_in(dir, buf, size);
+}
+
+void plat_temp_name(const char *path, char *buf, uint32_t size)
+{
+ if(WorkDir[0]) temp_in(WorkDir, buf, size);
+ else plat_temp_name_near(path, buf, size);
+}
+
+int plat_temp_free_space(const char *path, uint64_t *bytes)
+{
+ return WorkDir[0] ? space_of_dir(WorkDir, bytes) : plat_free_space(path, bytes);
+}
+
+int plat_move(const char *from, const char *to)
+{
+ BPTR in, out;
+ uint8_t *buf;
+ int32 n = 0, err = 0;
+ if(IDOS->Rename(from, to)) return 0;
+ /* another volume: copy */
+ buf = malloc(65536);
+ in = IDOS->FOpen(from, MODE_OLDFILE, 0);
+ out = in ? IDOS->FOpen(to, MODE_NEWFILE, 0) : 0;
+ if(buf == NULL || in == 0 || out == 0) err = buf ? IDOS->IoErr() : ERROR_NO_FREE_STORE;
+ while(err == 0 && (n = IDOS->FRead(in, buf, 1, 65536)) > 0)
+ {
+  if(IDOS->FWrite(out, buf, 1, n) != (uint32)n) err = IDOS->IoErr();
+ }
+ if(err == 0 && n < 0) err = IDOS->IoErr();
+ if(out && !IDOS->FClose(out) && err == 0) err = IDOS->IoErr();
+ if(in) IDOS->FClose(in);
+ free(buf);
+ if(err)
+ {
+  if(out) IDOS->Delete(to);
+  IDOS->SetIoErr(err);
+  return -1;
+ }
+ IDOS->Delete(from);
+ return 0;
 }
 
 int plat_break(void)
@@ -295,14 +385,19 @@ int plat_writable(const char *path, char *buf, uint32_t size)
  return 0;
 }
 
-int plat_free_space(const char *path, uint64_t *bytes)
+static int space_of_dir(const char *dir, uint64_t *bytes)
 {
  struct statvfs sv;
- char dir[1024];
- parent_of(path, dir, sizeof(dir));
  if(statvfs(dir, &sv) != 0) return -1;
  *bytes = (uint64_t)sv.f_bavail * (uint64_t)sv.f_frsize;
  return 0;
+}
+
+int plat_free_space(const char *path, uint64_t *bytes)
+{
+ char dir[1024];
+ parent_of(path, dir, sizeof(dir));
+ return space_of_dir(dir, bytes);
 }
 
 uint64_t plat_size(const char *path)
@@ -311,13 +406,92 @@ uint64_t plat_size(const char *path)
  return stat(path, &st) == 0 ? (uint64_t)st.st_size : 0;
 }
 
+static char WorkDir[1024];
+
+void plat_set_workdir(const char *dir)
+{
+ snprintf(WorkDir, sizeof(WorkDir), "%s", dir ? dir : "");
+}
+
+int plat_check_workdir(const char *dir, char *buf, uint32_t size)
+{
+ struct stat st;
+ if(stat(dir, &st) != 0)
+ {
+  if(plat_not_found()) snprintf(buf, size, "work drawer %s doesn't exist", dir);
+  else plat_fault(dir, buf, size);
+  return 1;
+ }
+ if(!S_ISDIR(st.st_mode))
+ {
+  snprintf(buf, size, "work drawer %s is not a drawer", dir);
+  return 1;
+ }
+ if(access(dir, W_OK) != 0)
+ {
+  snprintf(buf, size, "work drawer %s can't be written", dir);
+  return 1;
+ }
+ return 0;
+}
+
 static uint32_t TempCount;
 
-void plat_temp_name(const char *path, char *buf, uint32_t size)
+static void temp_in(const char *dir, char *buf, uint32_t size)
+{
+ char name[32];
+ snprintf(name, sizeof(name), "ae%08lx.tmp", (unsigned long)((uint32_t)getpid() ^ (++TempCount * 0x9E3779B9u)));
+ plat_join(buf, size, dir, name);
+}
+
+void plat_temp_name_near(const char *path, char *buf, uint32_t size)
 {
  char dir[1024];
  parent_of(path, dir, sizeof(dir));
- snprintf(buf, size, "%s/ae%08lx.tmp", dir, (unsigned long)((uint32_t)getpid() ^ (++TempCount * 0x9E3779B9u)));
+ temp_in(dir, buf, size);
+}
+
+void plat_temp_name(const char *path, char *buf, uint32_t size)
+{
+ if(WorkDir[0]) temp_in(WorkDir, buf, size);
+ else plat_temp_name_near(path, buf, size);
+}
+
+int plat_temp_free_space(const char *path, uint64_t *bytes)
+{
+ return WorkDir[0] ? space_of_dir(WorkDir, bytes) : plat_free_space(path, bytes);
+}
+
+int plat_move(const char *from, const char *to)
+{
+ FILE *in, *out = NULL;
+ uint8_t *buf;
+ size_t n;
+ int err = 0;
+ if(rename(from, to) == 0) return 0;
+ if(errno != EXDEV) return -1;
+ /* another file system: copy */
+ buf = malloc(65536);
+ in = fopen(from, "rb");
+ if(buf && in) out = fopen(to, "wb");
+ if(buf == NULL) err = ENOMEM;
+ else if(in == NULL || out == NULL) err = errno;
+ while(err == 0 && (n = fread(buf, 1, 65536, in)) > 0)
+ {
+  if(fwrite(buf, 1, n, out) != n) err = errno ? errno : EIO;
+ }
+ if(err == 0 && ferror(in)) err = EIO;
+ if(out && fclose(out) != 0 && err == 0) err = errno;
+ if(in) fclose(in);
+ free(buf);
+ if(err)
+ {
+  if(out) remove(to);
+  errno = err;
+  return -1;
+ }
+ remove(from);
+ return 0;
 }
 
 static volatile sig_atomic_t Broken;

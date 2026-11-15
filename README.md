@@ -36,12 +36,15 @@ Nothing is unpacked and repacked (except TGZ, which is one packed stream).
 The new archive is written to a temporary file next to the old one
 (`aeXXXXXXXX.tmp`, short enough for any file system) and replaces it only
 when everything worked; the archive keeps its own protection bits and file
-note. Ctrl-C stops arcedit and leaves the archive as it was.
+note. Ctrl-C stops arcedit and leaves the archive as it was. `WORKDIR`
+puts the temporary files in another drawer; the new archive is then moved
+next to the old one (copied when that drawer is on another volume) before
+it replaces it, so a failure still leaves the archive as it was.
 
 ## Usage
 
 ```
-arcedit ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/K,FROM=LIST/K,INFO/S,QUIET/S
+arcedit ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/K,FROM=LIST/K,INFO/S,WORKDIR/K,QUIET/S
 ```
 
 | Command | Does |
@@ -55,6 +58,7 @@ arcedit ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/
 | `arcedit Work:a.lha docs/a.txt PROTECT +s-d` | Add or remove protection bits (`hsparwed`) |
 | `arcedit Work:a.lha ADD RAM:x RAM:Drawer TO docs` | Add files and drawers (with their contents) below `docs` |
 | `arcedit Work:a.zip INFO` | Show the format and the operations it allows |
+| `arcedit Work:a.lha docs DELETE WORKDIR RAM:` | Keep the temporary files in `RAM:` instead of the archive's drawer |
 
 - Entry names are archive paths with `/` between drawers, matched without
   regard to case.
@@ -65,6 +69,10 @@ arcedit ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/
   Added entries keep the file's protection bits, file note and date. Empty
   drawers get a drawer entry.
 - A rename to a name that's already in the archive is refused.
+- `WORKDIR` names an existing drawer for the temporary files (the new
+  archive, TGZ's unpacked tar). Free space is then needed there and, for
+  the finished archive, in the archive's own drawer. Without it, or with
+  `WORKDIR ""`, they go to the archive's drawer. INFO ignores it.
 - `QUIET` prints only errors.
 
 Return codes: 0 done, 5 some entries weren't in the archive (the others

@@ -48,12 +48,17 @@ The archive keeps its protection bits and file note. Before writing,
 arcedit checks that the archive can be replaced and that there is enough
 free space. Ctrl-C stops arcedit; the archive stays as it was.
 
+With WORKDIR the temporary files go to another drawer instead. The new
+archive is then moved next to the old one (copied when that drawer is on
+another volume) before it replaces it, so a failure still leaves the
+archive as it was.
+
 
 Usage
 -----
 
   arcedit ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,
-          ADD/S,TO/K,FROM=LIST/K,INFO/S,QUIET/S
+          ADD/S,TO/K,FROM=LIST/K,INFO/S,WORKDIR/K,QUIET/S
 
   arcedit Work:a.lha docs readme.txt DELETE
       Delete entries. A drawer name deletes everything in it.
@@ -82,6 +87,9 @@ Usage
   arcedit Work:a.zip INFO
       Show the format and the operations the archive allows.
 
+  arcedit Work:a.lha docs DELETE WORKDIR RAM:
+      Keep the temporary files in RAM: instead of the archive's drawer.
+
 - Entry names are archive paths with / between drawers. Upper and lower
   case don't matter.
 - COMMENT and PROTECT can be given together, and take a list (FROM) like
@@ -90,6 +98,10 @@ Usage
   .tar, .tgz or .gz name). Added entries keep the file's protection bits,
   file note and date. Empty drawers get a drawer entry.
 - A rename to a name that's already in the archive is refused.
+- WORKDIR names an existing drawer for the temporary files (the new
+  archive, TGZ's unpacked tar). Free space is then needed there and, for
+  the finished archive, in the archive's own drawer. Without it, or with
+  WORKDIR "", they go to the archive's drawer. INFO ignores it.
 - QUIET prints only errors.
 
 
