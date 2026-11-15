@@ -136,4 +136,4 @@ python3 tests/corpus.py DIR   # every edit on real archives in DIR, checked with
 | `tests/` | Host tests and sample archives made by LhA 2.15 |
 | `tests/os4/` | Scenario tests in an AmigaOS 4 guest (locks, full and write protected volumes, low memory, Ctrl-C) |
 | `package/` | AmigaOS 4 release: readme, Installer script, documentation, icons |
-| `tools/` | `make_lha.sh` (release archive), `make_icons.py` + `os4/mkicon.c` (release icons) |
+| `tools/` | `make_lha.sh` (release archive), `make_icons.py` + `os4/mkicon.c` (release icons), `os4depot_submit.py` (upload a new version to OS4Depot, replacing the published one) |
