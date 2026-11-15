@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-"""Submit a new arcedit version to OS4Depot, replacing the published one
-(utility/archive/arcedit.lha, OS4Depot file id 14270).
+"""Submit a new arcedit version to OS4Depot, replacing the published
+utility/archive/arcedit.lha. Submissions wait in the maintainer's queue
+until approved.
+
+The file id changes with every replace, so it is never stored here: the
+script opens the file's readme page, follows its "Replace file" link and
+sends to that form (its action and its f_replaces value).
 
   tools/os4depot_submit.py           show what would be sent (nothing is sent)
   tools/os4depot_submit.py --send    send it (multipart POST, like the web form);
@@ -8,14 +13,37 @@
 
 Run tools/make_lha.sh first: it writes dist/arcedit.lha and build/stage/arcedit.readme.
 """
+import html
 import os
+import re
 import subprocess
 import sys
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 ARCHIVE = os.path.join(ROOT, "dist", "arcedit.lha")
 README = os.path.join(ROOT, "build", "stage", "arcedit.readme")
-URL = "https://os4depot.net/index.php?function=submit&replace=14270&mode=go"  # replaces the published file
+SITE = "https://os4depot.net/"
+PUBLISHED = "utility/archive/arcedit.lha"
+AGENT = "Mozilla/5.0 (compatible; os4depot-submit)"
+
+
+def fetch(url):
+    return subprocess.run(["curl", "-sS", "--max-time", "60", "-A", AGENT, url],
+                          capture_output=True, check=True).stdout.decode("latin-1")
+
+
+# readme page -> "Replace file" link -> the replace form
+page = fetch(SITE + "?function=showfile&file=" + PUBLISHED)
+m = re.search(r"<A HREF='([^']*replace=\d+[^']*)'><IMG ALT='Replace file'", page, re.I)
+if m is None:
+    sys.exit("no 'Replace file' link on the readme page of " + PUBLISHED)
+form = fetch(SITE + html.unescape(m.group(1)).lstrip("/"))
+action = re.search(r"<FORM[^>]*enctype='multipart/form-data'[^>]*ACTION='([^']*)'", form, re.I)
+replaces = re.search(r"NAME='f_replaces' VALUE='([^']*)'", form, re.I)
+if action is None or replaces is None or replaces.group(1) != PUBLISHED:
+    sys.exit("the replace form is not the one for " + PUBLISHED +
+             f" (f_replaces {replaces.group(1) if replaces else None!r})")
+URL = SITE + html.unescape(action.group(1)).lstrip("/")
 
 readme = open(README, encoding="latin-1").read()
 head, body = readme.split("hend:\n", 1)
@@ -34,7 +62,7 @@ fields = [
     ("f_url", ""),
     ("f_donateurl", ""),
     ("f_category", meta["category"]),
-    ("f_replaces", "utility/archive/arcedit.lha"),
+    ("f_replaces", replaces.group(1)),
     ("f_requirements", "AmigaOS 4.1"),
     ("f_license", meta["license"]),
     ("f_distributesubm", "selected"),
@@ -61,7 +89,7 @@ if not os.environ.get("OS4DEPOT_EMAIL"):
     sys.exit("not sent: OS4DEPOT_EMAIL missing")
 
 cmd = ["curl", "-sS", "-o", "/dev/stdout", "-w", "\nHTTP %{http_code}\n", "--max-time", "600",
-       "-A", "Mozilla/5.0 (compatible; os4depot-submit)"]
+       "-A", AGENT]
 for name, value in fields:
     cmd += ["--form-string", f"{name}={value}"]
 cmd += ["-F", f"f_userfile=@{ARCHIVE};type=application/x-lha;filename=arcedit.lha", URL]
