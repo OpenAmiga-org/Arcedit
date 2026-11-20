@@ -151,6 +151,7 @@ it replaces it, so a failure still leaves the archive as it was.
 ## Changelog
 
 <!-- changelog start: made by tools/update_readme.py from package/arcedit.readme -->
+- **1.2** (2026-11-20): New icons in the AmigaOS 4.1 style.
 - **1.1** (2026-11-15):
   - `WORKDIR` keeps the temporary files in another drawer.
   - `PROTECT` on an LHA entry made on Unix removes its Unix permission header, so xadmaster and other readers show the new bits.

@@ -30,6 +30,7 @@
 ** Change history:
 **  2026-11-14 orgin, created
 **  2026-11-15 orgin, WORKDIR
+**  2026-11-20 orgin, 1.2: new release icons
 */
 
 #include <stdio.h>
@@ -51,7 +52,7 @@
 #define RETURN_FAIL  20
 #endif
 
-#define VERSION_STRING "arcedit 1.1 (15.11.2026)"
+#define VERSION_STRING "arcedit 1.2 (20.11.2026)"
 
 static const char __attribute__((used)) verstag[] = "\0$VER: " VERSION_STRING;
 /* the shell gives commands this much stack at least */

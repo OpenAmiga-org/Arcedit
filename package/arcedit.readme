@@ -93,6 +93,10 @@ Public domain. All of arcedit's code is written for it, the Deflate and
 
 ## History
 
+### 1.2 (20.11.2026)
+
+- New icons in the AmigaOS 4.1 style.
+
 ### 1.1 (15.11.2026)
 
 - `WORKDIR` keeps the temporary files in another drawer.
