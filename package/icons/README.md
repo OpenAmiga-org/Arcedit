@@ -4,16 +4,27 @@ These `.info` files were saved by AmigaOS 4's icon.library (native format,
 64x64 true colour pictures, normal and selected). AmigaOS 4 does not read
 PNG icons, so they can't be written on the host.
 
-The pictures are the OS 4.1 style set made with the icon tools in
-`~/os4icons` (export set `arcedit`: `out/arcedit/<icon>.png` and
-`<icon>.sel.png`; the drawers use the stock `def_drawer` picture as their
-base, as most Amiga programs do). To change an icon:
+Their pictures are in `pictures/`: `<icon>.png` (normal) and
+`<icon>.sel.png` (selected), 64x64 RGBA, in the OS 4.1 style. The drawers
+use the stock `def_drawer` picture as their base, as most Amiga programs
+do. The selected pictures are made like the stock OS 4.1 ones (each
+colour channel 84 darker, gold glow), so they are used as they are.
 
-1. Make or change the pictures in `~/os4icons` and export them.
-2. `python3 -I tools/make_icons.py build/icons [PICTURES]` writes `*.argb`,
-   `mkicons.script` and `icons-preview.png` (PICTURES defaults to
-   `~/os4icons/out/arcedit`; the icons' types, tools, tool types, stacks
-   and windows are in its ICONS table).
+| Icon | Picture | In the archive |
+|------|---------|----------------|
+| `arcedit` | drawer with a box and a pencil | `arcedit.info` |
+| `Install` | drive with a green arrow | `arcedit/Install.info` |
+| `arcedit.txt` | text page | `arcedit/arcedit.txt.info` |
+| `C` | drawer with a shell window | `arcedit/C.info` |
+| `C_arcedit` | shell window with a box and a pencil | `arcedit/C/arcedit.info` |
+
+To change an icon:
+
+1. Change its pictures in `pictures/`.
+2. `python3 -I tools/make_icons.py build/icons` writes `*.argb`,
+   `mkicons.script` and `icons-preview.png` (a second argument takes the
+   pictures from another drawer; the icons' types, tools, tool types,
+   stacks and windows are in its ICONS table).
 3. Build `tools/os4/mkicon.c` with `ppc-amigaos-gcc` and copy it, the
    `.argb` files and the script to a drawer in the OS4 guest.
 4. Run `Execute mkicons.script` in that drawer; the icons appear in `out/`.

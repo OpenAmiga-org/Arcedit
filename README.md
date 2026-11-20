@@ -28,8 +28,8 @@ Download: [arcedit.lha on OS4Depot](https://os4depot.net/?function=showfile&file
 - `package/`: AmigaOS 4 release: readme, Installer script, documentation,
   icons
 - `tools/`: `make_lha.sh` (release archive), `make_icons.py` +
-  `os4/mkicon.c` (release icons from the OS 4.1 style pictures made in
-  `~/os4icons`, see `package/icons/README.md`), `os4depot_submit.py`
+  `os4/mkicon.c` (release icons from the pictures in
+  `package/icons/pictures`, see `package/icons/README.md`), `os4depot_submit.py`
   (upload a new version to OS4Depot, replacing the published one)
 
 ## Supported formats

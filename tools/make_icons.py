@@ -3,9 +3,9 @@
 
     python3 -I tools/make_icons.py OUTDIR [PICTURES]
 
-The pictures are the OS 4.1 style set made in ~/os4icons (export set
-"arcedit": PICTURES/<icon>.png + <icon>.sel.png, 64x64, default
-~/os4icons/out/arcedit). The selected pictures are used as they are.
+The pictures are PICTURES/<icon>.png + <icon>.sel.png, 64x64 RGBA
+(default package/icons/pictures, the OS 4.1 style set). The selected
+pictures are used as they are.
 Writes OUTDIR/<icon>.argb and .sel.argb (raw ARGB) and OUTDIR/mkicons.script,
 an AmigaDOS script that runs tools/os4/mkicon in the OS4 guest;
 icon.library then saves the icons in its own format. The results are kept
@@ -16,6 +16,7 @@ import sys
 
 from PIL import Image
 
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WBDRAWER, WBTOOL, WBPROJECT = 2, 3, 4
 SIZE = 64
 
@@ -43,7 +44,7 @@ def picture(pictures, name):
 
 def main():
     out = sys.argv[1]
-    pictures = sys.argv[2] if len(sys.argv) > 2 else os.path.expanduser("~/os4icons/out/arcedit")
+    pictures = sys.argv[2] if len(sys.argv) > 2 else os.path.join(ROOT, "package", "icons", "pictures")
     os.makedirs(out, exist_ok=True)
     lines = ["; created by tools/make_icons.py; run in the drawer with the .argb files", "FailAt 21",
              "MakeDir out QUIET"]
