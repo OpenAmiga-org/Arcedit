@@ -36,7 +36,7 @@ sudo docker run --rm -u "$(id -u):$(id -g)" -v "$D/C:/c" walkero/amigagccondocke
 	ppc-amigaos-strip /c/arcedit
 cp "$ROOT/package/arcedit/Install" "$D/"
 sed -e "s/@VERSION@/$ver/g" -e "s/@AMIGADATE@/$amigadate/g" "$ROOT/package/arcedit/arcedit.txt" > "$D/arcedit.txt"
-sed -e "s/@VERSION@/$ver/g" -e "s/@DATE@/$isodate/g" "$ROOT/package/arcedit.readme" > "$STAGE/arcedit.readme"
+sed -e "s/@VERSION@/$ver/g" -e "s/@DATE@/$amigadate/g" "$ROOT/package/arcedit.readme" > "$STAGE/arcedit.readme"
 
 # icons saved by icon.library itself (tools/make_icons.py, package/icons/README.md)
 I="$ROOT/package/icons"
@@ -48,3 +48,6 @@ rm -f "$OUT"
 (cd "$STAGE" && "$LHA" aq2o5 "$OUT" arcedit.info arcedit.readme arcedit)
 "$LHA" l "$OUT"
 echo "arcedit $ver ($amigadate) -> $OUT"
+
+# the GitHub page's changelog, from the readme
+python3 -I "$ROOT/tools/update_readme.py"

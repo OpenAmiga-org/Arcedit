@@ -5,7 +5,7 @@ date: @DATE@
 author: Björn Hagström
 submitter: Björn Hagström
 email:
-url:
+url: http://openamiga.org/?function=gitproject&name=Arcedit
 category: utility/archive
 replaces:
 requirements:
@@ -15,21 +15,29 @@ texttype: Markdown
 distribute: yes
 hend:
 
+# arcedit @VERSION@ - edit archives in place
+
 **arcedit** changes archives in place, without unpacking and repacking
 them: rename, delete and add entries, and change their comments (file
 notes) and protection bits. It is a Shell command, so file managers and
 scripts can use it too, like they use LhA.
 
-### What it can do
+arcedit is an [OpenAmiga.org project](http://openamiga.org/?function=gitproject&name=Arcedit).
+The source code, test versions and bug reports are at
+<https://github.com/OpenAmiga-org/Arcedit>.
 
-| Format | Delete | Rename | Comment | Protection | Add |
-|---|---|---|---|---|---|
-| LHA (.lha, .lzh) | yes | yes | yes | yes | yes, packed |
-| ZIP (.zip) | yes | yes | yes | yes | yes, packed |
-| LZX (.lzx) | yes, except part of a merged group | yes | yes | yes | yes, stored |
-| TAR (.tar) | yes | yes | yes | owner rwe | yes |
-| TGZ (.tgz, .tar.gz) | yes | yes | yes | owner rwe | yes, packed |
-| GZIP (.gz) | - | stored name | yes | - | replaces the file |
+## Features
+
+- LHA (`.lha`, `.lzh`): delete, rename, comment, protection; add (packed).
+- ZIP (`.zip`): delete, rename, comment, protection; add (packed).
+- LZX (`.lzx`): delete (except one file of a merged group), rename,
+  comment, protection; add (stored).
+- TAR (`.tar`): delete, rename, comment; protection (owner rwe); add.
+- TGZ (`.tgz`, `.tar.gz`): delete, rename, comment; protection (owner
+  rwe); add (packed).
+- GZIP (`.gz`): the stored name and the comment; add replaces the file.
+
+This holds for every format.
 
 - Only the changed parts are written: a delete copies the other entries
   byte for byte, a rename or comment rewrites only that entry's header, an
@@ -42,33 +50,32 @@ scripts can use it too, like they use LhA.
 - **Safe**: the new archive is written to a temporary file next to the old
   one and replaces it only when everything worked. Before writing,
   arcedit checks free space, write protection and memory. Ctrl-C stops it
-  and leaves the archive as it was. WORKDIR puts the temporary files in
+  and leaves the archive as it was. `WORKDIR` puts the temporary files in
   another drawer.
 - No libraries needed.
 
-### Examples
+## Installation
 
-```
-arcedit Work:a.lha docs/old.txt DELETE
-arcedit Work:a.lha DELETE FROM RAM:list
-arcedit Work:a.lha RENAME docs/a.txt AS docs/b.txt
-arcedit Work:a.zip docs/a.txt COMMENT "a note"
-arcedit Work:a.lzx docs/a.txt PROTECT +s-d
-arcedit Work:a.lha ADD RAM:new.txt RAM:Drawer TO docs
-arcedit Work:a.zip INFO
-arcedit Work:a.lha docs DELETE WORKDIR RAM:
-```
+Double-click Install, or copy `C/arcedit` to `C:`. The documentation is in
+`arcedit.txt`.
 
-Template:
+## Using it
 
-```
-ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/K,FROM=LIST/K,INFO/S,WORKDIR/K,QUIET/S
-```
+Some examples, and below them the command's template.
 
-### For programs that use arcedit
+    arcedit Work:a.lha docs/old.txt DELETE
+    arcedit Work:a.lha DELETE FROM RAM:list
+    arcedit Work:a.lha RENAME docs/a.txt AS docs/b.txt
+    arcedit Work:a.zip docs/a.txt COMMENT "a note"
+    arcedit Work:a.lzx docs/a.txt PROTECT +s-d
+    arcedit Work:a.lha ADD RAM:new.txt RAM:Drawer TO docs
+    arcedit Work:a.zip INFO
+    arcedit Work:a.lha docs DELETE WORKDIR RAM:
 
-`arcedit <archive> INFO` prints one line, the archive type and the
-operations this archive allows, for example
+    ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/K,FROM=LIST/K,INFO/S,WORKDIR/K,QUIET/S
+
+For programs that use arcedit: `arcedit <archive> INFO` prints one line,
+the archive type and the operations this archive allows, for example
 `ZIP: DELETE RENAME COMMENT PROTECT ADD`. It reads only the first bytes of
 the archive, so it is instant for any archive size, and lists nothing when
 the archive can't be replaced (write protected volume, delete protected
@@ -79,17 +86,19 @@ When an operation fails, the last line of the output is
 archive is unchanged. Return code 5 with `Warning:` lines means some
 entries weren't in the archive; the others were done.
 
-### Installation
+## License
 
-Double-click Install, or copy C/arcedit to C:. The documentation is in
-arcedit.txt.
+Public domain. All of arcedit's code is written for it, the Deflate and
+`-lh5-` packers too.
 
-### History
+## History
 
-- @VERSION@ (@DATE@): WORKDIR keeps the temporary files in another
-  drawer. PROTECT on an LHA entry made on Unix removes its Unix permission
+### 1.1 (15.11.2026)
+
+- `WORKDIR` keeps the temporary files in another drawer.
+- `PROTECT` on an LHA entry made on Unix removes its Unix permission
   header, so xadmaster and other readers show the new bits.
-- 1.0 (2026-11-15): first release.
 
-arcedit is public domain, all its code is written for it (the Deflate and
--lh5- packers too).
+### 1.0 (15.11.2026)
+
+- First release.

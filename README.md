@@ -1,9 +1,37 @@
-# arcedit
+# Arcedit
 
 Edit archives without unpacking them: rename, delete and add entries, and
 change their comments (file notes) and protection bits. A standalone
 command for **AmigaOS 4** and **Linux**, public domain, with no other
 libraries needed.
+arcedit is an [OpenAmiga.org project](http://openamiga.org/?function=gitproject&name=Arcedit).
+
+Download: [arcedit.lha on OS4Depot](https://os4depot.net/?function=showfile&file=utility/archive/arcedit.lha)
+(the AmigaOS 4 command, an Install script, the documentation and icons).
+
+## Layout
+
+- `src/main.c`: Command line and the operations
+- `src/arcformat.h`: Interface of an archive format
+- `src/lhaformat.c`: LHA backend for that interface
+- `src/lha.c`, `src/lha.h`: LHA archive model: headers, reading, writing
+- `src/lh5enc.c`: `-lh5-` compressor
+- `src/deflate.c`: Deflate compressor and decompressor (RFC 1951), CRC-32
+- `src/zipformat.c`, `src/tarformat.c`, `src/gzformat.c`,
+  `src/lzxformat.c`: The other format backends
+- `src/platform.c`: File system calls (AmigaOS 4 and POSIX for the tests)
+- `docs/lha_format.md`: The LHA header details arcedit relies on
+- `docs/formats.md`: How each format is handled, and its limits
+- `tests/`: Host tests and sample archives made by LhA 2.15
+- `tests/os4/`: Scenario tests in an AmigaOS 4 guest (locks, full and write
+  protected volumes, low memory, Ctrl-C)
+- `package/`: AmigaOS 4 release: readme, Installer script, documentation,
+  icons
+- `tools/`: `make_lha.sh` (release archive), `make_icons.py` +
+  `os4/mkicon.c` (release icons), `os4depot_submit.py` (upload a new
+  version to OS4Depot, replacing the published one)
+
+## Supported formats
 
 | Format | DELETE | RENAME | COMMENT | PROTECT | ADD | New archive | Notes |
 |---|---|---|---|---|---|---|---|
@@ -19,29 +47,7 @@ library) reads; RAR 5 isn't among them. `.bz2` and `.xz` hold one stream
 without names or other fields, so there's nothing to edit. Every format is
 written in arcedit's own code. Details per format: `docs/formats.md`.
 
-## How it works
-
-Archives like LHA, ZIP and LZX are lists of members, each a header
-followed by that file's own packed data. Every member is packed on its own,
-so (LHA as the example):
-
-- **delete** copies the other members byte for byte and leaves the deleted
-  ones out,
-- **rename**, **comment** and **protection** rebuild only the headers of the
-  changed members,
-- **add** packs only the new files (`-lh5-`, or stored when that is
-  smaller) and replaces entries with the same name.
-
-Nothing is unpacked and repacked (except TGZ, which is one packed stream).
-The new archive is written to a temporary file next to the old one
-(`aeXXXXXXXX.tmp`, short enough for any file system) and replaces it only
-when everything worked; the archive keeps its own protection bits and file
-note. Ctrl-C stops arcedit and leaves the archive as it was. `WORKDIR`
-puts the temporary files in another drawer; the new archive is then moved
-next to the old one (copied when that drawer is on another volume) before
-it replaces it, so a failure still leaves the archive as it was.
-
-## Usage
+## Using it
 
 ```
 arcedit ARCHIVE/A,ENTRIES/M,DELETE/S,RENAME/K,AS/K,COMMENT/K,PROTECT/K,ADD/S,TO/K,FROM=LIST/K,INFO/S,WORKDIR/K,QUIET/S
@@ -119,21 +125,43 @@ python3 tests/corpus.py DIR   # every edit on real archives in DIR, checked with
                 # the repository: download archives from Aminet / OS4Depot)
 ```
 
-## Files
+## Design notes
 
-| File | Contents |
-|---|---|
-| `src/main.c` | Command line and the operations |
-| `src/arcformat.h` | Interface of an archive format |
-| `src/lhaformat.c` | LHA backend for that interface |
-| `src/lha.c`, `src/lha.h` | LHA archive model: headers, reading, writing |
-| `src/lh5enc.c` | `-lh5-` compressor |
-| `src/deflate.c` | Deflate compressor and decompressor (RFC 1951), CRC-32 |
-| `src/zipformat.c`, `src/tarformat.c`, `src/gzformat.c`, `src/lzxformat.c` | The other format backends |
-| `src/platform.c` | File system calls (AmigaOS 4 and POSIX for the tests) |
-| `docs/lha_format.md` | The LHA header details arcedit relies on |
-| `docs/formats.md` | How each format is handled, and its limits |
-| `tests/` | Host tests and sample archives made by LhA 2.15 |
-| `tests/os4/` | Scenario tests in an AmigaOS 4 guest (locks, full and write protected volumes, low memory, Ctrl-C) |
-| `package/` | AmigaOS 4 release: readme, Installer script, documentation, icons |
-| `tools/` | `make_lha.sh` (release archive), `make_icons.py` + `os4/mkicon.c` (release icons), `os4depot_submit.py` (upload a new version to OS4Depot, replacing the published one) |
+Archives like LHA, ZIP and LZX are lists of members, each a header
+followed by that file's own packed data. Every member is packed on its own,
+so (LHA as the example):
+
+- **delete** copies the other members byte for byte and leaves the deleted
+  ones out,
+- **rename**, **comment** and **protection** rebuild only the headers of the
+  changed members,
+- **add** packs only the new files (`-lh5-`, or stored when that is
+  smaller) and replaces entries with the same name.
+
+Nothing is unpacked and repacked (except TGZ, which is one packed stream).
+The new archive is written to a temporary file next to the old one
+(`aeXXXXXXXX.tmp`, short enough for any file system) and replaces it only
+when everything worked; the archive keeps its own protection bits and file
+note. Ctrl-C stops arcedit and leaves the archive as it was. `WORKDIR`
+puts the temporary files in another drawer; the new archive is then moved
+next to the old one (copied when that drawer is on another volume) before
+it replaces it, so a failure still leaves the archive as it was.
+
+## Changelog
+
+<!-- changelog start: made by tools/update_readme.py from package/arcedit.readme -->
+- **1.1** (2026-11-15):
+  - `WORKDIR` keeps the temporary files in another drawer.
+  - `PROTECT` on an LHA entry made on Unix removes its Unix permission header, so xadmaster and other readers show the new bits.
+- **1.0** (2026-11-15): First release.
+<!-- changelog end -->
+
+## History
+
+arcedit was written in November 2026 by Björn Hagström, for the archive
+view of Filer (it began as lhaedit, for LHA only). It was developed on
+GitHub from the start and moved to the OpenAmiga-org organization in
+November 2026.
+
+Public domain: all of arcedit's code is written for it, the Deflate and
+`-lh5-` packers too.
